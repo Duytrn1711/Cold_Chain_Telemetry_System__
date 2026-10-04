@@ -254,15 +254,3 @@ Sau khi khởi động server, có thể kiểm tra nhanh:
 ```powershell
 Invoke-RestMethod http://localhost:3000/api/health
 ```
-
-## Lưu ý phát triển
-
-- Backend đang phục vụ frontend static bằng Express nên không cần chạy frontend dev server riêng.
-- Database sử dụng PostgreSQL, không phải SQLite.
-- Schema hiện dùng ID do ứng dụng tự sinh bằng `MAX(id) + 1`; khi kiểm thử đồng thời cần chú ý nguy cơ trùng ID.
-- Một số thông tin hiển thị trên UI như RSSI, pin, tuyến đường hoặc dữ liệu chart có thể là dữ liệu mô phỏng phục vụ demo.
-- Không dùng tài khoản và JWT secret mặc định trong môi trường production.
-
-## License
-
-Dự án phục vụ mục đích học tập, minh họa và phát triển nội bộ. Chưa khai báo license phát hành công khai.
