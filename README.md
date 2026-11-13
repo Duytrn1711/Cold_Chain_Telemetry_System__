@@ -129,31 +129,39 @@ Ví dụ body cập nhật:
 
 Giao diện `/pages/agri-batches.html` cho phép tra cứu lô, gán phương tiện/kho và cập nhật các bước vận chuyển. Dữ liệu lô hiển thị từ PostgreSQL.
 
-## Các trang chính
+## Các trang giao diện
 
-- `/login.html` — đăng nhập hoặc gửi yêu cầu tạo tài khoản
-- `/dashboard.html` — số liệu thực từ database
-- `/pages/agri-batches.html` — luồng lô hàng Agri-Audit
-- `/pages/user-approvals.html` — hàng đợi duyệt tài khoản (ADMIN)
-- `/pages/vehicles.html`, `/pages/warehouses.html`, `/pages/devices.html`
-- `/pages/data.html`, `/pages/alerts.html`, `/pages/reports.html`
+| Trang | Đường dẫn |
+|---|---|
+| Đăng nhập | `/login.html` |
+| Dashboard | `/dashboard.html` |
+| Kho | `/pages/warehouses.html` |
+| Chi tiết kho | `/pages/warehouses-detail.html?id=1` |
+| Xe vận chuyển | `/pages/vehicles.html` |
+| Chi tiết xe | `/pages/vehicles-detail.html?id=1` |
+| Thiết bị | `/pages/devices.html` |
+| Chi tiết thiết bị | `/pages/devices-detail.html?id=1` |
+| Telemetry | `/pages/data.html` |
+| Cảnh báo | `/pages/alerts.html` |
+| Báo cáo | `/pages/reports.html` |
 
-## Đăng ký và phê duyệt tài khoản
+## Kiểm thử
 
-Đăng ký công khai chỉ cho phép đề nghị vai trò `STAFF` hoặc `MANAGER`. Mật khẩu được băm trước khi lưu; tài khoản mới ở trạng thái `PENDING` và không thể đăng nhập trước khi admin duyệt. Admin mở mục **Account approvals** để cấp vai trò cuối cùng (`STAFF`/`MANAGER`) hoặc từ chối. Vai trò `ADMIN` chỉ được tạo qua bootstrap/quản trị, không qua form công khai.
+Tài liệu kiểm thử thủ công: [QA/Cold_Chain_QA_Test.docx](QA/Cold_Chain_QA_Test.docx).
+Sau khi khởi động server, có thể kiểm tra nhanh:
 
-API: `POST /api/auth/register` (công khai), `GET /api/auth/registration-requests` và `PATCH /api/auth/users/:id/approval` (chỉ ADMIN).
+```powershell
+Invoke-RestMethod http://localhost:3000/api/health
+```
 
-Dashboard, báo cáo và biểu đồ chỉ dùng bản ghi đã lưu. Khi chưa có dữ liệu, giao diện hiển thị trạng thái rỗng/—. Các trường pin, RSSI, GPS hoặc payload thô không được PostgreSQL schema hiện tại lưu thì được báo là chưa ghi nhận, không tự tạo giá trị.
+## Lưu ý phát triển
 
-## Cấu hình bảo mật
+- Backend đang phục vụ frontend static bằng Express nên không cần chạy frontend dev server riêng.
+- Database sử dụng PostgreSQL, không phải SQLite.
+- Schema hiện dùng ID do ứng dụng tự sinh bằng `MAX(id) + 1`; khi kiểm thử đồng thời cần chú ý nguy cơ trùng ID.
+- Một số thông tin hiển thị trên UI như RSSI, pin, tuyến đường hoặc dữ liệu chart có thể là dữ liệu mô phỏng phục vụ demo.
+- Không dùng tài khoản và JWT secret mặc định trong môi trường production.
 
-- Không đưa `Backend/.env` vào Git.
-- Đặt JWT secret và webhook secret dài, ngẫu nhiên và khác nhau.
-- Chỉ mở webhook qua mạng tin cậy/HTTPS trong môi trường triển khai; bảo vệ secret như credential.
-- Tài khoản admin đầu tiên được tạo bằng `npm run bootstrap-admin`, không có tài khoản demo mặc định.
-- Trên database hiện có, chạy thêm migration `20261113_user_registration.sql`; migration này thêm email và dấu vết phê duyệt, không thay đổi tài khoản hiện hữu.
+## License
 
-## Công nghệ
-
-Node.js, Express, PostgreSQL, `pg`, JWT, bcryptjs, HTML/CSS/JavaScript thuần và Chart.js.
+Dự án phục vụ mục đích học tập, minh họa và phát triển nội bộ. Chưa khai báo license phát hành công khai.
