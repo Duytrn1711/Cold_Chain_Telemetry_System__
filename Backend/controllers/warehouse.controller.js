@@ -15,7 +15,7 @@ exports.getAllWarehouses = async (req, res) => {
                 w.created_at,
                 COUNT(DISTINCT v.id) AS vehicle_count,
                 COUNT(DISTINCT d.id) AS device_count,
-                COALESCE(ROUND(AVG(dt.temperature), 1), 3.8) AS avg_temp
+                ROUND(AVG(dt.temperature), 1) AS avg_temp
             FROM warehouse w
             LEFT JOIN delivery_vehicle v ON v.warehouse_id = w.id
             LEFT JOIN device d ON d.warehouse_id = w.id
@@ -105,12 +105,22 @@ exports.getWarehouseById = async (req, res) => {
             ORDER BY d.id ASC
         `, [id]);
 
+        const historyRes = await pool.query(`
+            SELECT dt.id, dt.device_id, d.device_token, dt.temperature, dt.humidity, dt.created_at
+            FROM data dt
+            JOIN device d ON d.id = dt.device_id
+            WHERE d.warehouse_id = $1
+            ORDER BY dt.created_at DESC
+            LIMIT 100
+        `, [id]);
+
         return res.json({
             success: true,
             data: {
                 ...warehouse,
                 vehicles: vehiclesRes.rows,
-                devices: devicesRes.rows
+                devices: devicesRes.rows,
+                telemetryHistory: [...historyRes.rows].reverse()
             },
             message: "Lấy chi tiết kho thành công"
         });

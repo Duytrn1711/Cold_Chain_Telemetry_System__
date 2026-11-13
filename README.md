@@ -1,268 +1,159 @@
 # Cold Chain Telemetry System
 
-Ứng dụng quản lý và theo dõi dữ liệu chuỗi lạnh, gồm kho hàng, xe vận chuyển,
-thiết bị IoT, telemetry nhiệt độ/độ ẩm và cảnh báo. Repository hiện cung cấp
-backend Express, frontend HTML/CSS/JavaScript và dữ liệu PostgreSQL phục vụ
-demo, học tập và kiểm thử.
+Cold Chain là dịch vụ tiếp nhận yêu cầu lấy lô hàng từ Agri-Audit, quản lý vận chuyển đến điểm kiểm định, rồi giao đến điểm tiêu thụ nếu lô được duyệt hoặc trả về địa chỉ nông dân nếu bị từ chối. Danh mục kho, xe, thiết bị, telemetry, cảnh báo, lô hàng và lịch sử vận hành được lưu trong PostgreSQL.
 
-> Đây là prototype/demo, không phải hệ thống đã được chứng nhận cho vận hành
-> chuỗi cung ứng hoặc tuân thủ quy định. Không sử dụng dữ liệu, tài khoản hay
-> cấu hình mẫu cho môi trường production.
-
-## Chức năng
-
-- Dashboard tổng quan về kho, xe, thiết bị, telemetry, cảnh báo và tuân thủ
-  nhiệt độ.
-- Tra cứu và quản lý kho, xe vận chuyển, thiết bị cảm biến.
-- Xem dữ liệu telemetry, lịch sử theo thiết bị và báo cáo theo kho/xe.
-- Tạo telemetry qua API; khi nhiệt độ dưới `2°C` hoặc trên `8°C`, backend tự
-  tạo cảnh báo.
-- Đăng nhập bằng JWT và giới hạn thao tác theo vai trò.
-- Giao diện có trang đăng nhập, dashboard, dữ liệu telemetry, cảnh báo và báo
-  cáo.
-
-## Công nghệ
-
-- **Backend:** Node.js, Express 5, PostgreSQL (`pg`), `jsonwebtoken`,
-  `bcryptjs`, `cors`, `dotenv`.
-- **Frontend:** HTML, CSS, JavaScript thuần, Fetch API và Chart.js.
-- **Kiểm thử:** Tài liệu test thủ công trong `QA/Cold_Chain_QA_Test.docx`.
-  `backend/package.json` hiện không khai báo script test tự động.
-
-## Cấu trúc repository
-
-```text
-.
-├── BA/                         # Tài liệu phân tích và sơ đồ nghiệp vụ
-├── backend/
-│   ├── app.js                  # Express app, API mount và static frontend
-│   ├── db.js                   # PostgreSQL connection pool
-│   ├── schema.sql              # Tạo bảng và nạp dữ liệu demo
-│   ├── seed-warehouses.js      # Thêm telemetry mẫu cho thiết bị kho
-│   ├── controllers/            # Xử lý nghiệp vụ API
-│   ├── routes/                 # Khai báo API routes
-│   └── package.json
-├── design-references/          # Tài liệu tham khảo thiết kế
-├── frontend/
-│   ├── login.html
-│   ├── dashboard.html
-│   ├── pages/                  # Các trang nghiệp vụ
-│   ├── js/                     # Logic giao diện và API client
-│   ├── css/
-│   └── assets/
-├── QA/                         # Tài liệu kiểm thử
-└── README.md
-```
+Cold Chain cung cấp API tích hợp cho Agri-Audit và giao diện vận hành cho nhân viên. Agri-Audit hiện cần cấu hình phía gửi webhook theo hợp đồng ở dưới; repo này chỉ triển khai phía Cold Chain.
 
 ## Yêu cầu
 
-- Node.js và npm.
-- PostgreSQL đang chạy và tài khoản có quyền tạo database, bảng.
-- `psql` trong `PATH`, hoặc PostgreSQL SQL Shell để chạy lệnh SQL.
-- Trình duyệt hiện đại.
+- Node.js và npm
+- PostgreSQL
+- Tạo database rỗng trước khi chạy schema
 
-## Cài đặt và chạy
-
-### 1. Tạo database
-
-Tạo database trống:
-
-```sql
-CREATE DATABASE cold_chain_telemetry;
-```
-
-Từ thư mục gốc repository, nạp schema và dữ liệu mẫu:
+## Cài đặt
 
 ```powershell
-psql -U postgres -d cold_chain_telemetry -f .\backend\schema.sql
-```
-
-**Lưu ý:** `backend/schema.sql` tạo bảng, nạp dữ liệu mẫu và có lệnh
-`TRUNCATE` trên các bảng nghiệp vụ. Chỉ chạy trên database demo mới hoặc
-database mà bạn chấp nhận bị xóa dữ liệu tương ứng. Đây không phải migration
-an toàn để chạy lại trên database đang sử dụng.
-
-Schema mẫu có 10 kho, 20 xe, 40 thiết bị, 400 bản ghi telemetry và 4 tài khoản
-demo.
-
-### 2. Cấu hình backend
-
-Tạo `backend/.env` với cấu hình PostgreSQL của máy bạn:
-
-```env
-PORT=3000
-
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=your_postgres_password
-DB_NAME=cold_chain_telemetry
-
-JWT_SECRET=replace_with_a_long_random_secret
-JWT_EXPIRES_IN=7d
-```
-
-Không đưa `.env`, mật khẩu hoặc JWT secret thật lên Git. Backend hiện có giá
-trị JWT secret dự phòng trong mã nguồn; cần loại bỏ giá trị dự phòng và cấu
-hình secret an toàn trước khi triển khai thực tế.
-
-### 3. Cài dependency và khởi động
-
-```powershell
-Set-Location .\backend
+createdb -U postgres cold_chain_telemetry
+psql -U postgres -d cold_chain_telemetry -f .\Backend\schema.sql
+psql -U postgres -d cold_chain_telemetry -f .\Backend\migrations\20261113_agri_batches.sql
+psql -U postgres -d cold_chain_telemetry -f .\Backend\migrations\20261113_user_registration.sql
+Copy-Item .\Backend\.env.example .\Backend\.env
+Set-Location .\Backend
 npm install
+```
+
+Điền thông tin database, `JWT_SECRET` (tối thiểu 32 ký tự) và `AGRI_WEBHOOK_SECRET` riêng trong `.env`. Đặt thông tin bootstrap admin mạnh trước khi tạo tài khoản:
+
+```powershell
+npm run bootstrap-admin
 npm start
 ```
 
-Chạy chế độ phát triển có `nodemon`:
+Ứng dụng mặc định chạy tại `http://localhost:3000`. Không chạy `schema.sql` trên database đã có dữ liệu: file này tạo schema cho database mới. Với database hiện có, sao lưu trước và chạy migration bổ sung Agri batches; không nạp lại seed/demo data.
 
-```powershell
-npm run dev
-```
+## Luồng lô hàng
 
-Mặc định ứng dụng chạy tại `http://localhost:3000`. Express phục vụ cả frontend
-và API, vì vậy không cần chạy frontend server riêng. Mở:
+1. Agri-Audit gửi yêu cầu lấy lô hàng đến địa chỉ nông dân.
+2. Nhân viên Cold Chain gán kho/xe và cập nhật trạng thái `PICKUP_ASSIGNED`, `PICKED_UP`, `AT_INSPECTION`.
+3. Agri-Audit gửi quyết định kiểm định. `APPROVED` chuyển lô sang `DELIVERY_READY`; Cold Chain giao đến `consumption_address`. `REJECTED` chuyển sang `RETURN_READY`; địa chỉ trả hàng là `pickup_address`.
+4. Nhân viên ghi nhận `OUT_FOR_DELIVERY` rồi `DELIVERED`, hoặc `OUT_FOR_RETURN` rồi `RETURNED`.
 
-- Đăng nhập: <http://localhost:3000/login.html>
-- Dashboard: <http://localhost:3000/dashboard.html>
-- API health check: <http://localhost:3000/api/health>
-- Kiểm tra kết nối PostgreSQL: <http://localhost:3000/api/test-db>
+Các trạng thái giao/hoàn trả được backend giới hạn theo quyết định kiểm định. Mỗi event webhook có `event_id` duy nhất để chống xử lý lặp; event ID đã dùng cho lô khác sẽ bị từ chối.
 
-Frontend mặc định gọi API tại cùng origin khi chạy trên cổng `3000`; nếu đổi
-cổng, cần kiểm tra cấu hình API trong `frontend/js/api.js`.
+## API tích hợp Agri-Audit
 
-### Dữ liệu mẫu bổ sung
-
-`backend/seed-warehouses.js` thêm các bản ghi telemetry mẫu cho thiết bị kho.
-Schema chính đã có thiết bị kho và dữ liệu ban đầu; chỉ chạy script này nếu
-muốn bổ sung thêm dữ liệu. Mỗi lần chạy script sẽ thêm telemetry mới, không
-chỉ cập nhật dữ liệu hiện có.
-
-## Tài khoản demo
-
-Các tài khoản được tạo bởi `backend/schema.sql`:
-
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `admin123` | `ADMIN` |
-| `manager` | `manager123` | `MANAGER` |
-| `user` | `user123` | `USER` |
-| `staff` | `staff123` | `STAFF` |
-
-Chỉ sử dụng trong môi trường local/demo. Đổi mật khẩu sau khi đăng nhập và
-không triển khai các tài khoản này trên hệ thống thật. Backend tự băm mật khẩu
-mẫu khi tài khoản đăng nhập lần đầu.
-
-## API
-
-Base URL: `http://localhost:3000/api`.
-
-| Method | Endpoint | Mô tả |
-|---|---|---|
-| `GET` | `/health` | Kiểm tra server |
-| `GET` | `/test-db` | Kiểm tra kết nối PostgreSQL |
-| `POST` | `/auth/login` | Đăng nhập, nhận JWT |
-| `GET` | `/auth/me` | Lấy thông tin tài khoản hiện tại; cần đăng nhập |
-| `PUT` | `/auth/change-password` | Đổi mật khẩu; cần đăng nhập |
-| `GET` | `/warehouses`, `/warehouses/:id` | Danh sách và chi tiết kho |
-| `POST`, `PUT` | `/warehouses`, `/warehouses/:id` | Tạo và cập nhật kho |
-| `DELETE` | `/warehouses/:id` | Xóa kho |
-| `GET` | `/vehicles`, `/vehicles/:id` | Danh sách và chi tiết xe |
-| `POST`, `PUT` | `/vehicles`, `/vehicles/:id` | Tạo và cập nhật xe |
-| `DELETE` | `/vehicles/:id` | Xóa xe |
-| `GET` | `/devices`, `/devices/:id` | Danh sách và chi tiết thiết bị |
-| `POST`, `PUT` | `/devices`, `/devices/:id` | Tạo và cập nhật thiết bị |
-| `DELETE` | `/devices/:id` | Xóa thiết bị |
-| `GET` | `/data/summary` | Số liệu tổng quan cho dashboard |
-| `GET` | `/data/reports` | Báo cáo theo kho/xe; hỗ trợ `period` với giá trị `today`, `week`, `month` hoặc `quarter` |
-| `GET` | `/data` | Danh sách telemetry; hỗ trợ `device_id`, `warehouse_id`, `vehicle_id`, `page`, `limit` |
-| `GET` | `/data/device/:deviceId` | Lịch sử telemetry theo thiết bị |
-| `POST` | `/data` | Ghi telemetry; ngoài ngưỡng nhiệt độ sẽ sinh cảnh báo |
-| `GET` | `/alerts`, `/alerts/:id` | Danh sách và chi tiết cảnh báo |
-| `POST` | `/alerts` | Tạo cảnh báo |
-| `DELETE` | `/alerts/:id` | Xóa cảnh báo |
-
-Các endpoint GET được cấu hình đọc công khai. Các thao tác tạo/cập nhật dữ liệu
-và cảnh báo yêu cầu role `MANAGER` trở lên; xóa kho, xe và thiết bị yêu cầu
-`ADMIN`. Xóa cảnh báo yêu cầu `MANAGER` trở lên. Endpoint `/auth/me` và
-`/auth/change-password` yêu cầu đăng nhập.
-
-Các API cần JWT nhận token theo header:
+Base URL: `http://<cold-chain-host>:3000/api/integrations/agri/batches`. Hai webhook dùng header dùng chung bí mật:
 
 ```text
-Authorization: Bearer <JWT>
+x-agri-webhook-secret: <AGRI_WEBHOOK_SECRET>
+Content-Type: application/json
 ```
 
-### Ví dụ gọi API bằng PowerShell
+### Tạo yêu cầu lấy hàng
 
-Đăng nhập:
+`POST /pickup-requests`
 
-```powershell
-$loginBody = @{
-  username = "admin"
-  password = "admin123"
-} | ConvertTo-Json
-
-$login = Invoke-RestMethod -Method Post `
-  -Uri "http://localhost:3000/api/auth/login" `
-  -ContentType "application/json" `
-  -Body $loginBody
-
-$token = $login.data.token
+```json
+{
+  "event_id": "evt-unique-001",
+  "batch_code": "AGR-2026-0001",
+  "product_name": "Tomato",
+  "product_type": "Fresh produce",
+  "producer_name": "Nguyen Van A",
+  "producer_phone": "+84901234567",
+  "pickup_address": "Farm address, commune, district, province",
+  "pickup_latitude": 10.1234567,
+  "pickup_longitude": 106.1234567,
+  "consumption_point_name": "Distribution market",
+  "consumption_address": "Market address, district, province",
+  "consumption_latitude": 10.2345678,
+  "consumption_longitude": 106.2345678,
+  "quantity": 250,
+  "unit": "kg",
+  "production_date": "2026-11-12",
+  "expiry_date": "2026-11-20"
+}
 ```
 
-Gửi một bản ghi telemetry:
+Bắt buộc: `event_id`, `batch_code`, `product_name`, `producer_name`, `pickup_address`, `quantity` dương và `unit`. Tọa độ, liên hệ, loại sản phẩm và ngày là tùy chọn. Gửi lại cùng event/lô trả bản ghi hiện tại mà không tạo event mới.
 
-```powershell
-$telemetryBody = @{
-  device_id = 1
-  temperature = 5.5
-  humidity = 75
-} | ConvertTo-Json
+### Gửi quyết định kiểm định
 
-Invoke-RestMethod -Method Post `
-  -Uri "http://localhost:3000/api/data" `
-  -Headers @{ Authorization = "Bearer $token" } `
-  -ContentType "application/json" `
-  -Body $telemetryBody
+`POST /:batchCode/inspection-decision`
+
+Duyệt:
+
+```json
+{
+  "event_id": "evt-unique-002",
+  "decision": "APPROVED",
+  "consumption_point_name": "Distribution market",
+  "consumption_address": "Market address, district, province",
+  "consumption_latitude": 10.2345678,
+  "consumption_longitude": 106.2345678,
+  "decided_at": "2026-11-13T08:30:00Z"
+}
 ```
 
-Khoảng nhiệt độ được backend dùng để đánh giá là `2.0°C`–`8.0°C`; chỉ số thấp
-hơn hoặc cao hơn khoảng này sẽ tạo cảnh báo khi ghi telemetry.
+Từ chối:
 
-## Các trang giao diện
-
-| Trang | Đường dẫn |
-|---|---|
-| Đăng nhập | `/login.html` |
-| Dashboard | `/dashboard.html` |
-| Kho | `/pages/warehouses.html` |
-| Chi tiết kho | `/pages/warehouses-detail.html?id=1` |
-| Xe vận chuyển | `/pages/vehicles.html` |
-| Chi tiết xe | `/pages/vehicles-detail.html?id=1` |
-| Thiết bị | `/pages/devices.html` |
-| Chi tiết thiết bị | `/pages/devices-detail.html?id=1` |
-| Telemetry | `/pages/data.html` |
-| Cảnh báo | `/pages/alerts.html` |
-| Báo cáo | `/pages/reports.html` |
-
-## Kiểm thử
-
-Tài liệu kiểm thử thủ công: [QA/Cold_Chain_QA_Test.docx](QA/Cold_Chain_QA_Test.docx).
-Sau khi khởi động server, có thể kiểm tra nhanh:
-
-```powershell
-Invoke-RestMethod http://localhost:3000/api/health
+```json
+{
+  "event_id": "evt-unique-003",
+  "decision": "REJECTED",
+  "reason": "Inspection criteria not met",
+  "decided_at": "2026-11-13T08:30:00Z"
+}
 ```
 
-## Lưu ý phát triển
+`event_id` là duy nhất toàn hệ thống; từ chối bắt buộc có `reason`; duyệt bắt buộc có `consumption_address`. Khi trả hàng, Cold Chain dùng địa chỉ nông dân đã gửi trong yêu cầu lấy hàng.
 
-- Backend đang phục vụ frontend static bằng Express nên không cần chạy frontend dev server riêng.
-- Database sử dụng PostgreSQL, không phải SQLite.
-- Schema hiện dùng ID do ứng dụng tự sinh bằng `MAX(id) + 1`; khi kiểm thử đồng thời cần chú ý nguy cơ trùng ID.
-- Một số thông tin hiển thị trên UI như RSSI, pin, tuyến đường hoặc dữ liệu chart có thể là dữ liệu mô phỏng phục vụ demo.
-- Không dùng tài khoản và JWT secret mặc định trong môi trường production.
+## API vận hành Cold Chain
 
-## License
+Các endpoint dưới cần JWT. Danh sách lô yêu cầu vai trò STAFF trở lên; cập nhật luồng cần MANAGER trở lên.
 
-Dự án phục vụ mục đích học tập, minh họa và phát triển nội bộ. Chưa khai báo license phát hành công khai.
+- `GET /api/agri-batches?status=PICKUP_REQUESTED`
+- `GET /api/agri-batches/:id`
+- `PATCH /api/agri-batches/:id/logistics-status`
+
+Ví dụ body cập nhật:
+
+```json
+{
+  "logistics_status": "PICKUP_ASSIGNED",
+  "vehicle_id": 3,
+  "warehouse_id": 2,
+  "note": "Assigned for farm pickup"
+}
+```
+
+Giao diện `/pages/agri-batches.html` cho phép tra cứu lô, gán phương tiện/kho và cập nhật các bước vận chuyển. Dữ liệu lô hiển thị từ PostgreSQL.
+
+## Các trang chính
+
+- `/login.html` — đăng nhập hoặc gửi yêu cầu tạo tài khoản
+- `/dashboard.html` — số liệu thực từ database
+- `/pages/agri-batches.html` — luồng lô hàng Agri-Audit
+- `/pages/user-approvals.html` — hàng đợi duyệt tài khoản (ADMIN)
+- `/pages/vehicles.html`, `/pages/warehouses.html`, `/pages/devices.html`
+- `/pages/data.html`, `/pages/alerts.html`, `/pages/reports.html`
+
+## Đăng ký và phê duyệt tài khoản
+
+Đăng ký công khai chỉ cho phép đề nghị vai trò `STAFF` hoặc `MANAGER`. Mật khẩu được băm trước khi lưu; tài khoản mới ở trạng thái `PENDING` và không thể đăng nhập trước khi admin duyệt. Admin mở mục **Account approvals** để cấp vai trò cuối cùng (`STAFF`/`MANAGER`) hoặc từ chối. Vai trò `ADMIN` chỉ được tạo qua bootstrap/quản trị, không qua form công khai.
+
+API: `POST /api/auth/register` (công khai), `GET /api/auth/registration-requests` và `PATCH /api/auth/users/:id/approval` (chỉ ADMIN).
+
+Dashboard, báo cáo và biểu đồ chỉ dùng bản ghi đã lưu. Khi chưa có dữ liệu, giao diện hiển thị trạng thái rỗng/—. Các trường pin, RSSI, GPS hoặc payload thô không được PostgreSQL schema hiện tại lưu thì được báo là chưa ghi nhận, không tự tạo giá trị.
+
+## Cấu hình bảo mật
+
+- Không đưa `Backend/.env` vào Git.
+- Đặt JWT secret và webhook secret dài, ngẫu nhiên và khác nhau.
+- Chỉ mở webhook qua mạng tin cậy/HTTPS trong môi trường triển khai; bảo vệ secret như credential.
+- Tài khoản admin đầu tiên được tạo bằng `npm run bootstrap-admin`, không có tài khoản demo mặc định.
+- Trên database hiện có, chạy thêm migration `20261113_user_registration.sql`; migration này thêm email và dấu vết phê duyệt, không thay đổi tài khoản hiện hữu.
+
+## Công nghệ
+
+Node.js, Express, PostgreSQL, `pg`, JWT, bcryptjs, HTML/CSS/JavaScript thuần và Chart.js.

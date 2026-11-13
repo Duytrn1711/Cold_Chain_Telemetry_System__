@@ -7,11 +7,26 @@ let devTelemetryChart = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     await loadDevices();
+    await populateDeviceAssignments();
     initDeviceFilters();
     initRegisterModal();
     initTabs();
     renderDeviceDetailChart();
 });
+
+async function populateDeviceAssignments() {
+    try {
+        const [warehouseResponse, vehicleResponse] = await Promise.all([api.get("/warehouses"), api.get("/vehicles")]);
+        const warehouses = warehouseResponse.success ? warehouseResponse.data : [];
+        const vehicles = vehicleResponse.success ? vehicleResponse.data : [];
+        const warehouseOptions = '<option value="">-- No warehouse assignment --</option>' + warehouses.map((item) => `<option value="${item.id}">${item.warehouse_name}</option>`).join("");
+        const vehicleOptions = '<option value="">-- No vehicle assignment --</option>' + vehicles.map((item) => `<option value="${item.id}">${item.license_plate}</option>`).join("");
+        ["reg-wh-id", "edit-dev-wh"].forEach((id) => { const element = document.getElementById(id); if (element) element.innerHTML = warehouseOptions; });
+        ["reg-veh-id", "edit-dev-veh"].forEach((id) => { const element = document.getElementById(id); if (element) element.innerHTML = vehicleOptions; });
+    } catch (error) {
+        console.error("Could not load assignment lists:", error);
+    }
+}
 
 async function loadDevices() {
     const tbody = document.getElementById("devices-tbody");
@@ -21,6 +36,16 @@ async function loadDevices() {
         const res = await api.get("/devices");
         if (res.success && res.data) {
             allDevices = res.data;
+            const total = document.getElementById("device-total-count");
+            const active = document.getElementById("device-active-count");
+            const excursions = document.getElementById("device-excursion-count");
+            if (total) total.textContent = String(allDevices.length);
+            if (active) active.textContent = String(allDevices.filter(item => item.status === "ACTIVE").length);
+            if (excursions) excursions.textContent = String(allDevices.filter(item => item.temperature != null && (Number(item.temperature) < 2 || Number(item.temperature) > 8)).length);
+            const countTag = document.getElementById("device-count-tag");
+            const pagination = document.getElementById("device-pagination-info");
+            if (countTag) countTag.textContent = `(${allDevices.length} database records)`;
+            if (pagination) pagination.textContent = `Showing ${allDevices.length} of ${allDevices.length} registered devices`;
             renderDevicesTable(allDevices);
         }
     } catch (error) {
@@ -32,173 +57,52 @@ async function loadDevices() {
 function renderDevicesTable(list) {
     const tbody = document.getElementById("devices-tbody");
     if (!tbody) return;
-
-    if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:30px;">No matching devices found</td></tr>`;
+    if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#64748b;">No registered devices match this filter.</td></tr>';
         return;
     }
-
-    tbody.innerHTML = list.slice(0, 10).map((dev, idx) => {
-        const isExcursion = dev.id == 4 || dev.device_token.includes("004") || (dev.temperature && dev.temperature > 8.0);
-        const entityName = dev.warehouse_name ? `Hanoi Central WH-0${dev.warehouse_id}` : (dev.license_plate ? `${dev.license_plate} (Highway 5B)` : "Unassigned Unit");
-        const entityType = dev.warehouse_id ? "Warehouse" : (dev.vehicle_id ? "Delivery Vehicle" : "Standby");
-        const entityIcon = dev.warehouse_id ? "🏢" : "🚚";
-        const rssi = dev.id == 1 ? "-62 dBm" : (dev.id == 2 ? "-68 dBm" : (dev.id == 4 ? "-74 dBm" : "-80 dBm"));
-        const battery = dev.id <= 2 ? "100% (Mains)" : (dev.id == 4 ? "94%" : "88%");
-        const tempVal = isExcursion ? "10.8°C" : (dev.temperature ? `${dev.temperature}°C` : (dev.id == 1 ? "3.8°C" : "4.1°C"));
-        const statusClass = isExcursion ? "badge-warning" : "badge-online";
-        const statusText = isExcursion ? "WARNING" : "ONLINE";
-
-        return `
-            <tr class="${isExcursion ? 'row-selected' : ''}" style="${isExcursion ? 'background:#fef2f2;' : ''}">
-                <td>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="color:#2563eb;">📡</span>
-                        <strong class="cell-code">DEV-00${dev.id}</strong>
-                        ${isExcursion ? '<span class="badge badge-critical" style="font-size:10px; padding:1px 6px;">FOCUSED</span>' : ''}
-                    </div>
-                </td>
-                <td style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#475569;">${dev.device_token}</td>
-                <td class="cell-bold">${entityName}</td>
-                <td>
-                    <span class="badge badge-neutral" style="font-size:11px;">${entityIcon} ${entityType}</span>
-                </td>
-                <td style="font-size:12px; color:#64748b;">${rssi}</td>
-                <td style="font-size:12px; font-weight:600; color:#334155;">⚡ ${battery}</td>
-                <td>
-                    <span class="temp-display ${isExcursion ? 'temp-danger' : 'temp-safe'}">${tempVal}</span>
-                </td>
-                <td>
-                    <span class="badge ${statusClass}">
-                        <span class="badge-dot"></span>
-                        ${statusText}
-                    </span>
-                </td>
-                <td>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <button type="button" class="btn-table-action" onclick="window.location.href='devices-detail.html?id=${dev.id}'" title="Device details">
-                            Details
-                        </button>
-                        ${window.Roles && Roles.can("write") ? `
-                        <button type="button" class="btn-table-action" onclick="openEditDeviceModal(${dev.id})" title="Edit device" style="padding:4px 8px;">
-                            ✏️
-                        </button>` : ""}
-                        ${window.Roles && Roles.can("delete") ? `
-                        <button type="button" class="btn-table-action" onclick="confirmDeleteDevice(${dev.id})" title="Delete device" style="padding:4px 8px; color:#ef4444;">
-                            🗑️
-                        </button>` : ""}
-                    </div>
-                </td>
-            </tr>
-        `;
+    tbody.innerHTML = list.map((device) => {
+        const temperature = device.temperature === null || device.temperature === undefined ? null : Number(device.temperature);
+        const excursion = temperature !== null && (temperature < 2 || temperature > 8);
+        const entity = device.warehouse_name || device.license_plate || "Unassigned";
+        const kind = device.warehouse_name ? "Warehouse" : (device.license_plate ? "Delivery vehicle" : "Unassigned");
+        const temperatureText = temperature === null ? "No reading" : `${temperature.toFixed(1)}°C`;
+        const state = String(device.status || "UNKNOWN").toUpperCase();
+        const stateClass = state === "ACTIVE" ? (excursion ? "badge-warning" : "badge-online") : "badge-neutral";
+        return `<tr>
+            <td><strong class="cell-code">${device.id}</strong></td>
+            <td class="cell-code">${device.device_token}</td>
+            <td class="cell-bold">${entity}</td>
+            <td><span class="badge badge-neutral">${kind}</span></td>
+            <td style="color:#64748b">Not collected</td>
+            <td style="color:#64748b">Not collected</td>
+            <td><span class="temp-display ${excursion ? "temp-danger" : "temp-safe"}">${temperatureText}</span></td>
+            <td><span class="badge ${stateClass}">${state}</span></td>
+            <td><div style="display:flex;gap:6px;">
+                <button type="button" class="btn-table-action" onclick="window.location.href='devices-detail.html?id=${device.id}'">Details</button>
+                ${window.Roles && Roles.can("write") ? `<button type="button" class="btn-table-action" onclick="openEditDeviceModal(${device.id})">Edit</button>` : ""}
+                ${window.Roles && Roles.can("delete") ? `<button type="button" class="btn-table-action" onclick="confirmDeleteDevice(${device.id})">Delete</button>` : ""}
+            </div></td>
+        </tr>`;
     }).join("");
 }
-
-function renderDeviceDetailChart() {
-    const ctx = document.getElementById("deviceTelemetryChart");
-    if (!ctx) return;
-
-    if (devTelemetryChart) {
-        devTelemetryChart.destroy();
-    }
-
-    const labels = ["08:00", "09:00", "10:00", "11:00", "12:00", "NOW"];
-    const tempData = [4.2, 4.4, 5.1, 7.8, 9.8, 10.8];
-    const humData = [60, 62, 65, 72, 75, 76];
-
-    devTelemetryChart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: "Temperature (°C)",
-                    data: tempData,
-                    borderColor: "#ef4444",
-                    backgroundColor: "rgba(239, 68, 68, 0.08)",
-                    borderWidth: 2.5,
-                    tension: 0.35,
-                    fill: true,
-                    yAxisID: "yTemp",
-                    pointRadius: (c) => c.raw > 8.0 ? 6 : 4,
-                    pointBackgroundColor: (c) => c.raw > 8.0 ? "#ef4444" : "#2563eb"
-                },
-                {
-                    label: "Humidity (RH %)",
-                    data: humData,
-                    borderColor: "#2563eb",
-                    borderDash: [4, 4],
-                    borderWidth: 2,
-                    tension: 0.3,
-                    fill: false,
-                    yAxisID: "yHum",
-                    pointRadius: 0
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: "#0f172a",
-                    padding: 10
-                }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { color: "#64748b" }
-                },
-                yTemp: {
-                    type: "linear",
-                    position: "left",
-                    min: -2,
-                    max: 13,
-                    ticks: {
-                        callback: (v) => `${v}°C`,
-                        color: "#ef4444"
-                    },
-                    grid: {
-                        color: (c) => c.tick.value === 2 || c.tick.value === 8 ? "rgba(37,99,235,0.3)" : "rgba(226,232,240,0.5)"
-                    }
-                },
-                yHum: {
-                    type: "linear",
-                    position: "right",
-                    min: 35,
-                    max: 100,
-                    ticks: {
-                        callback: (v) => `${v}%`,
-                        color: "#2563eb"
-                    },
-                    grid: { display: false }
-                }
-            }
-        }
-    });
-}
-
-function initTabs() {
-    const tabs = document.querySelectorAll(".dev-tab-item");
-    tabs.forEach(tab => {
-        tab.addEventListener("click", () => {
-            tabs.forEach(t => t.classList.remove("active"));
-            tab.classList.add("active");
-            const tabName = tab.getAttribute("data-tab");
-            showToast(`Switched to tab: ${tab.textContent.trim()}`, "info");
+async function renderDeviceDetailChart() {
+    const canvas = document.getElementById("deviceTelemetryChart");
+    if (!canvas || typeof Chart === "undefined") return;
+    if (devTelemetryChart) devTelemetryChart.destroy();
+    try {
+        const response = await api.get("/data", { limit: 24 });
+        const points = response.success && response.data?.list ? [...response.data.list].reverse() : [];
+        const labels = points.map((point) => new Date(point.created_at).toLocaleString());
+        devTelemetryChart = new Chart(canvas, {
+            type: "line",
+            data: { labels, datasets: [{ label: "Recorded temperature (°C)", data: points.map((point) => Number(point.temperature)), borderColor: "#2563eb", backgroundColor: "rgba(37, 99, 235, 0.08)", fill: true, spanGaps: false }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { y: { suggestedMin: 0, suggestedMax: 12, ticks: { callback: (value) => `${value}°C` } } } }
         });
-    });
-}
-
-function scrollToDeviceDetail() {
-    const el = document.getElementById("device-detail-section");
-    if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
+    } catch (error) {
+        console.error("Could not load device telemetry chart:", error);
     }
 }
-
 function initDeviceFilters() {
     const searchInput = document.getElementById("dev-search-input");
     const pills = document.querySelectorAll(".filter-pills-row .pill-btn");
@@ -367,16 +271,7 @@ window.confirmDeleteDevice = async function(id) {
     }
 };
 
-// Simulated sensor calibration cycle (GDP / ISO compliant)
 window.calibrateSensorNode = function() {
-    showToast("Initiating automated probe self-test & laser recalibration...", "info");
-    setTimeout(() => {
-        showToast("Ice Point Reference 0.0°C test: ERROR 0.02°C (PASSED)", "info");
-        setTimeout(() => {
-            showToast("✅ Sensor recalibration successful! ISO 9001 / WHO PQS compliant.", "success");
-            const diagVal = document.querySelector(".diag-item .diag-val");
-            if (diagVal) diagVal.textContent = "VERIFIED (Delta < 0.05°C)";
-        }, 1200);
-    }, 1200);
+    showToast("Calibration control is not connected to a device service.", "warning");
 };
 

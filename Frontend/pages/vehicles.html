@@ -513,12 +513,11 @@
                     </div>
 
                     <div class="filter-pills-row">
-                        <button type="button" class="pill-btn active" data-filter="ALL">All Fleet (<span
-                                id="count-all-fleet">10</span>)</button>
-                        <button type="button" class="pill-btn" data-filter="TRANSIT">In Transit (8)</button>
-                        <button type="button" class="pill-btn" data-filter="IDLE">Idle (2)</button>
+                        <button type="button" class="pill-btn active" data-filter="ALL">All Fleet (—)</button>
+                        <button type="button" class="pill-btn" data-filter="TRANSIT">In Transit (—)</button>
+                        <button type="button" class="pill-btn" data-filter="IDLE">Unassigned to shipment (—)</button>
                         <button type="button" class="pill-btn" data-filter="WARNING"
-                            style="color:#ef4444; border-color:#fecaca;">Excursion Warning (1)</button>
+                            style="color:#ef4444; border-color:#fecaca;">Temperature excursion (—)</button>
                     </div>
                 </div>
 
@@ -570,15 +569,12 @@
                                     </div>
                                     <div>
                                         <div style="display:flex; align-items:center; gap:10px;">
-                                            <h3 style="font-size:22px; font-weight:800;" id="v-detail-plate">Vehicle
-                                                29A-12345</h3>
-                                            <span class="badge badge-critical" id="v-detail-status-badge">In Transit -
-                                                Alert Active</span>
+                                            <h3 style="font-size:22px; font-weight:800;" id="v-detail-plate">Select a vehicle</h3>
+                                            <span class="badge badge-neutral" id="v-detail-status-badge">—</span>
                                         </div>
                                         <p style="font-size:13px; color:#64748b; margin-top:4px;"
                                             id="v-detail-subtitle">
-                                            Driver: Nguyen Van Binh · Assigned Depot: Hanoi Central WH-01 · Unit:
-                                            Carrier Transicold X4
+                                            Vehicle and shipment details are loaded from the database.
                                         </p>
                                     </div>
                                 </div>
@@ -628,13 +624,13 @@
                                 </div>
                                 <div class="v-stat-tile">
                                     <label>Battery 🔋</label>
-                                    <div class="big-val">94%</div>
-                                    <div class="sub-note">LiFePO4 Backup</div>
+                                    <div class="big-val">Not recorded</div>
+                                    <div class="sub-note">Battery telemetry is not stored</div>
                                 </div>
                                 <div class="v-stat-tile">
                                     <label>Speed ⏱️</label>
-                                    <div class="big-val">52 <span style="font-size:14px; font-weight:500;">km/h</span></div>
-                                    <div class="sub-note">Highway Cruise</div>
+                                    <div class="big-val">Not recorded</div>
+                                    <div class="sub-note">Vehicle speed is not stored</div>
                                 </div>
                             </div>
                         </div>
@@ -751,13 +747,7 @@
                     </div>
                     <div class="form-field">
                         <label for="new-veh-wh">Assigned Warehouse Hub *</label>
-                        <select id="new-veh-wh" required>
-                            <option value="1">Hanoi Central Cold Storage</option>
-                            <option value="2">Hai Phong Port Cold Facility</option>
-                            <option value="3">Da Nang Distribution Hub</option>
-                            <option value="4">Ho Chi Minh City Logistics Hub</option>
-                            <option value="5">Can Tho Mekong Cold Terminal</option>
-                        </select>
+                        <select id="new-veh-wh" required><option value="">Loading database locations…</option></select>
                     </div>
                     <div class="form-field">
                         <label for="new-veh-status">Initial Status</label>
@@ -792,13 +782,7 @@
                     </div>
                     <div class="form-field">
                         <label for="edit-veh-wh">Assigned Warehouse Hub *</label>
-                        <select id="edit-veh-wh" required>
-                            <option value="1">Hanoi Central Cold Storage</option>
-                            <option value="2">Hai Phong Port Cold Facility</option>
-                            <option value="3">Da Nang Distribution Hub</option>
-                            <option value="4">Ho Chi Minh City Logistics Hub</option>
-                            <option value="5">Can Tho Mekong Cold Terminal</option>
-                        </select>
+                        <select id="edit-veh-wh" required><option value="">Loading database locations…</option></select>
                     </div>
                     <div class="form-field">
                         <label for="edit-veh-status">Operational Status</label>

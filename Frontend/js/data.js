@@ -91,20 +91,14 @@ function wireLiveTelemetryListener() {
  */
 async function fetchDevices() {
     try {
-        const res = await api.get("/device");
+        const res = await api.get("/devices");
         if (res.success && Array.isArray(res.data)) {
             devicesList = res.data;
             populateDeviceDropdowns();
         }
     } catch (err) {
         console.warn("Could not fetch devices:", err);
-        devicesList = [
-            { id: 1, device_token: "DEV-001 (TK-9902-A)" },
-            { id: 2, device_token: "DEV-002 (TK-8812-B)" },
-            { id: 4, device_token: "DEV-004 (TK-7419-C)" },
-            { id: 5, device_token: "DEV-005 (TK-5521-D)" },
-            { id: 7, device_token: "DEV-007 (TK-3104-E)" }
-        ];
+        devicesList = [];
         populateDeviceDropdowns();
     }
 }
@@ -114,18 +108,14 @@ async function fetchDevices() {
  */
 async function fetchWarehouses() {
     try {
-        const res = await api.get("/warehouse");
+        const res = await api.get("/warehouses");
         if (res.success && Array.isArray(res.data)) {
             warehousesList = res.data;
             populateWarehouseDropdown();
         }
     } catch (err) {
         console.warn("Could not fetch warehouses:", err);
-        warehousesList = [
-            { id: 1, warehouse_name: "Hanoi Central Cold Storage" },
-            { id: 2, warehouse_name: "Hai Phong Port Cold Facility" },
-            { id: 3, warehouse_name: "Da Nang Distribution Hub" }
-        ];
+        warehousesList = [];
         populateWarehouseDropdown();
     }
 }
@@ -135,18 +125,14 @@ async function fetchWarehouses() {
  */
 async function fetchVehicles() {
     try {
-        const res = await api.get("/vehicle");
+        const res = await api.get("/vehicles");
         if (res.success && Array.isArray(res.data)) {
             vehiclesList = res.data;
             populateVehicleDropdown();
         }
     } catch (err) {
         console.warn("Could not fetch vehicles:", err);
-        vehiclesList = [
-            { id: 1, license_plate: "29A-12345" },
-            { id: 2, license_plate: "29A-67890" },
-            { id: 3, license_plate: "51C-77412" }
-        ];
+        vehiclesList = [];
         populateVehicleDropdown();
     }
 }
@@ -207,66 +193,33 @@ async function loadTelemetryList() {
 /**
  * Format raw telemetry row from backend or live socket
  */
-function formatRawPacket(r) {
-    const temp = parseFloat(r.temperature !== undefined ? r.temperature : 4.2);
-    const hum = Math.round(parseFloat(r.humidity !== undefined ? r.humidity : 68));
-    const deviceId = r.device_id || 1;
-    const devToken = r.device_token || (r.device && r.device.device_token) || `DEV-00${deviceId}`;
-
-    let entity = "General Sensor Node";
-    let isVehicle = false;
-
-    if (r.license_plate || (r.device && r.device.license_plate)) {
-        entity = `Vehicle ${r.license_plate || r.device.license_plate}`;
-        isVehicle = true;
-    } else if (r.warehouse_name || (r.device && r.device.warehouse_name)) {
-        entity = `Warehouse: ${r.warehouse_name || r.device.warehouse_name}`;
-        isVehicle = false;
-    } else if (deviceId === 4 || deviceId === 7) {
-        entity = "Vehicle 29A-12345";
-        isVehicle = true;
-    } else {
-        entity = "Hanoi WH-01 (Chamber A)";
-    }
-
-    let status = "NORMAL";
-    if (temp > 8.0) status = "HIGH";
-    else if (temp < 2.0) status = "LOW";
-    else if (hum > 80) status = "WARNING";
-
-    const id = r.id || Math.floor(890000 + Math.random() * 9999);
-    const timeStr = r.created_at 
-        ? new Date(r.created_at).toISOString().replace("T", " ").slice(0, 19)
-        : new Date().toISOString().replace("T", " ").slice(0, 19);
-
-    const battNum = 88 + (id % 12);
-    const rssi = -60 - (id % 25);
-    const latency = 12 + (id % 15);
-
+function formatRawPacket(row) {
+    const temperature = row.temperature === null || row.temperature === undefined ? null : Number(row.temperature);
+    const humidity = row.humidity === null || row.humidity === undefined ? null : Number(row.humidity);
+    const deviceId = row.device_id ?? row.device?.id ?? null;
+    const deviceToken = row.device_token || row.device?.device_token || "—";
+    const warehouseName = row.warehouse_name || row.device?.warehouse_name;
+    const licensePlate = row.license_plate || row.device?.license_plate;
+    const entity = licensePlate ? `Vehicle ${licensePlate}` : (warehouseName || deviceToken);
+    const status = temperature === null ? "UNKNOWN" : (temperature > 8 ? "HIGH" : (temperature < 2 ? "LOW" : (humidity !== null && humidity > 80 ? "WARNING" : "NORMAL")));
     return {
-        id,
+        id: row.id,
         device_id: deviceId,
-        device_token: devToken,
+        device_token: deviceToken,
         entity,
-        isVehicle,
-        warehouse_id: r.warehouse_id || (r.device && r.device.warehouse_id) || null,
-        vehicle_id: r.vehicle_id || (r.device && r.device.vehicle_id) || null,
-        temperature: temp,
-        humidity: hum,
-        battery: `${battNum}%`,
-        rssi: `${rssi} dBm`,
-        latency: `${latency}ms`,
-        created_at: timeStr,
+        isVehicle: Boolean(licensePlate),
+        warehouse_id: row.warehouse_id ?? row.device?.warehouse_id ?? null,
+        vehicle_id: row.vehicle_id ?? row.device?.vehicle_id ?? null,
+        temperature,
+        humidity,
+        battery: null,
+        rssi: null,
+        latency: null,
+        created_at: row.created_at ? new Date(row.created_at).toLocaleString() : "—",
         status,
-        raw: r
+        raw: row
     };
 }
-
-
-
-/**
- * Fetch summary statistics from /api/data/summary
- */
 async function loadTelemetrySummary() {
     try {
         const res = await api.get("/data/summary");
@@ -285,7 +238,7 @@ async function loadTelemetrySummary() {
             if (res.data.devices) {
                 const devEl = document.getElementById("stat-active-nodes");
                 if (devEl) {
-                    devEl.textContent = `${res.data.devices.active || 14} / ${res.data.devices.total || 14}`;
+                    devEl.textContent = `${res.data.devices.active ?? 0} / ${res.data.devices.total ?? 0}`;
                 }
             }
         }
@@ -298,23 +251,34 @@ async function loadTelemetrySummary() {
  * Update top KPI metrics dynamically based on current list
  */
 function updateTopStats(list) {
-    if (!list || list.length === 0) return;
+    if (!list || list.length === 0) {
+        ["stat-compliance-rate", "stat-excursions-count", "stat-excursion-detail", "band-safe-val", "band-low-val", "band-high-val"].forEach((id) => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = id === "stat-compliance-rate" ? "—" : "0";
+        });
+        if (pieChart) {
+            pieChart.data.datasets[0].data = [0, 0, 0];
+            pieChart.update();
+        }
+        return;
+    }
 
     const total = list.length;
     const safe = list.filter(r => r.temperature >= 2.0 && r.temperature <= 8.0).length;
     const high = list.filter(r => r.temperature > 8.0).length;
     const low = list.filter(r => r.temperature < 2.0).length;
     const excursions = high + low;
-    const rate = ((safe / total) * 100).toFixed(1);
+    const measuredTotal = list.filter((row) => row.temperature !== null).length;
+    const rate = measuredTotal ? ((safe / measuredTotal) * 100).toFixed(1) : null;
 
     const rateEl = document.getElementById("stat-compliance-rate");
-    if (rateEl) rateEl.innerHTML = `${rate}% <span style="font-size:12px; color:#10b981;">Target ≥99%</span>`;
+    if (rateEl) rateEl.textContent = rate === null ? "—" : `${rate}%`;
 
     const excEl = document.getElementById("stat-excursions-count");
     if (excEl) excEl.textContent = excursions;
 
     const excDetail = document.getElementById("stat-excursion-detail");
-    if (excDetail) {
+    if (excDetail && measuredTotal > 0) {
         if (high > 0) {
             const firstHigh = list.find(r => r.temperature > 8.0);
             excDetail.textContent = `${firstHigh.entity} (${firstHigh.temperature.toFixed(1)}°C)`;
@@ -373,8 +337,8 @@ function renderTelemetryTable() {
         const isLow = temp < 2.0;
         const isHumWarning = hum > 80;
 
-        let statusBadge = "badge-online";
-        let statusText = "NORMAL";
+        let statusBadge = temp === null ? "badge-neutral" : "badge-online";
+        let statusText = temp === null ? "NO READING" : "NORMAL";
         let tempColor = "#0f172a";
         let tempPrefix = "";
 
@@ -412,14 +376,14 @@ function renderTelemetryTable() {
                 </td>
                 <td>
                     <strong style="font-size:14px; color:${tempColor}; font-family:'JetBrains Mono',monospace;">
-                        ${tempPrefix}${temp.toFixed(1)}°C
+                        ${temp === null ? "—" : `${tempPrefix}${temp.toFixed(1)}°C`}
                     </strong>
                 </td>
                 <td>
-                    <span style="${isHumWarning ? 'background:#fffbeb; color:#b45309; padding:2px 6px; border-radius:4px; font-weight:700;' : ''}">${hum}% RH</span>
+                    <span style="${isHumWarning ? 'background:#fffbeb; color:#b45309; padding:2px 6px; border-radius:4px; font-weight:700;' : ''}">${hum === null ? "—" : `${hum}% RH`}</span>
                 </td>
                 <td>
-                    <span style="font-weight:600; color:#334155;">🔋 ${row.battery}</span>
+                    <span style="color:#64748b;">Not recorded</span>
                 </td>
                 <td>
                     <div class="signal-indicator">
@@ -429,7 +393,7 @@ function renderTelemetryTable() {
                             <span class="signal-bar active" style="height:10px;"></span>
                             <span class="signal-bar" style="height:12px;"></span>
                         </div>
-                        <span>${row.rssi} · ${row.latency}</span>
+                        <span style="color:#64748b;">Not recorded</span>
                     </div>
                 </td>
                 <td style="font-size:12px; color:#64748b; font-family:'JetBrains Mono',monospace;">
@@ -625,7 +589,12 @@ async function handleIngestSubmit(e) {
     e.preventDefault();
     const devId = document.getElementById("ingest-device-select").value;
     const temp = parseFloat(document.getElementById("ingest-temp").value);
-    const hum = parseFloat(document.getElementById("ingest-humidity").value || 65);
+    const humidityInput = document.getElementById("ingest-humidity").value.trim();
+    const hum = humidityInput === "" ? null : parseFloat(humidityInput);
+    if (!devId || !Number.isFinite(temp) || (hum !== null && !Number.isFinite(hum))) {
+        showToast("Choose a device and enter valid measurements.", "warning");
+        return;
+    }
 
     const submitBtn = document.getElementById("btn-submit-ingest");
     if (submitBtn) submitBtn.disabled = true;
@@ -656,16 +625,13 @@ function exportTelemetryData() {
         return;
     }
 
-    const headers = ["Telemetry ID", "Device Token", "Monitored Entity", "Temperature (C)", "Humidity (%)", "Battery", "Signal (RSSI)", "Latency", "Timestamp", "Status"];
+    const headers = ["Telemetry ID", "Device Token", "Monitored Entity", "Temperature (C)", "Humidity (%)", "Timestamp", "Status"];
     const rows = filteredTelemetry.map(r => [
         `TL-${r.id}`,
         r.device_token,
         `"${r.entity.replace(/"/g, '""')}"`,
         r.temperature,
         r.humidity,
-        r.battery,
-        r.rssi,
-        r.latency,
         r.created_at,
         r.status
     ]);
@@ -777,9 +743,9 @@ function initPieChart() {
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
-    const safe = allTelemetry.filter(r => r.temperature >= 2.0 && r.temperature <= 8.0).length || 12;
-    const low = allTelemetry.filter(r => r.temperature < 2.0).length || 1;
-    const high = allTelemetry.filter(r => r.temperature > 8.0).length || 1;
+    const safe = allTelemetry.filter(r => r.temperature !== null && r.temperature >= 2.0 && r.temperature <= 8.0).length;
+    const low = allTelemetry.filter(r => r.temperature !== null && r.temperature < 2.0).length;
+    const high = allTelemetry.filter(r => r.temperature !== null && r.temperature > 8.0).length;
 
     pieChart = new Chart(ctx, {
         type: "doughnut",

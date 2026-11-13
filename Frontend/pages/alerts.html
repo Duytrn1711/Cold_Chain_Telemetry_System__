@@ -397,7 +397,7 @@
                             <div class="stat-card-icon icon-success">🛡️</div>
                         </div>
                         <div class="stat-card-value">18 <span
-                                style="font-size:12px; color:#64748b; font-weight:500;">MTTR: 5.8 mins</span></div>
+                                style="font-size:12px; color:#64748b; font-weight:500;">Resolved alerts</span></div>
                     </div>
                 </div>
 
@@ -479,7 +479,7 @@
                                     minutes continuous</div>
                             </div>
                             <div style="text-align:right;">
-                                <div style="font-size:28px; font-weight:900; color:#ef4444;" id="inc-breach-temp">10.8°C
+                                <div style="font-size:28px; font-weight:900; color:#ef4444;" id="inc-breach-temp">—
                                 </div>
                                 <div style="font-size:11px; color:#64748b;" id="inc-metric-range">Target Range: 2.0°C -
                                     8.0°C</div>
@@ -502,7 +502,7 @@
                                 id="inc-progression-timeline">
                                 <span>-15m (5.4°C)</span>
                                 <span style="color:#ef4444;">-6m Breach (8.1°C)</span>
-                                <span style="color:#ef4444; font-weight:700;" id="inc-time-now">Now (10.8°C)</span>
+                                <span style="color:#ef4444; font-weight:700;" id="inc-time-now">—</span>
                             </div>
                         </div>
 
@@ -512,35 +512,32 @@
                             <div
                                 style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:10px;">
                                 <div style="color:#64748b; font-size:10px; font-weight:700;">DEVICE NODE</div>
-                                <div style="font-weight:700; margin:2px 0;" id="inc-node-token">● DEV-004</div>
-                                <div style="color:#64748b; font-size:11px;" id="inc-node-sub">Battery: 92% · GSM High
+                                <div style="font-weight:700; margin:2px 0;" id="inc-node-token">—</div>
+                                <div style="color:#64748b; font-size:11px;" id="inc-node-sub">No additional device telemetry stored.
                                 </div>
                             </div>
                             <div
                                 style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:10px;">
                                 <div style="color:#64748b; font-size:10px; font-weight:700;">ASSET TARGET</div>
-                                <div style="font-weight:700; margin:2px 0;" id="inc-asset-name">🚚 Vehicle 29A-12345
+                                <div style="font-weight:700; margin:2px 0;" id="inc-asset-name">—
                                 </div>
-                                <div style="color:#10b981; font-size:11px;" id="inc-asset-sub">Door: Closed (Magnetic
-                                    OK)</div>
+                                <div style="color:#64748b; font-size:11px;" id="inc-asset-sub">No additional asset status stored.</div>
                             </div>
                         </div>
 
                         <!-- Driver or Manager Contact -->
                         <div
                             style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:10px 14px; font-size:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
-                            <div id="inc-contact-name">👤 <strong>Nguyen Van Hung</strong> (Driver)</div>
-                            <a href="tel:+84912345678" id="inc-contact-phone"
-                                style="color:#2563eb; font-weight:700; text-decoration:none;">📞 +84 912 345 678</a>
+                            <div id="inc-contact-name">—</div>
+                            <a href="#" id="inc-contact-phone" style="color:#2563eb; font-weight:700; text-decoration:none;">—</a>
                         </div>
 
                         <!-- Transit Corridor or Room -->
                         <div style="font-size:12px; color:#475569; margin-bottom:14px;">
                             <div id="inc-location-type">📍 <strong>TRANSIT CORRIDOR</strong></div>
-                            <div style="margin-top:2px;" id="inc-location-detail">Hanoi Central WH-01 → Bac Ninh Cold
+                            <div style="margin-top:2px;" id="inc-location-detail">—
                                 Storage</div>
-                            <div style="color:#64748b; font-size:11px;" id="inc-location-sub">KM 24 Highway 1A (Speed:
-                                54 km/h)</div>
+                            <div style="color:#64748b; font-size:11px;" id="inc-location-sub">—</div>
                         </div>
 
                         <!-- Recommended SOP Checklist -->
@@ -576,63 +573,12 @@
                                 <button type="button" class="btn btn-secondary" onclick="viewLiveTelemetry()">
                                     📈 Live Telemetry
                                 </button>
-                                <button type="button" class="btn btn-danger" onclick="openMaintenanceDispatchModal()">
-                                    🚨 Maintenance Dispatch
-                                </button>
+                                <button type="button" class="btn btn-secondary" disabled title="Maintenance dispatch is not integrated">Dispatch unavailable</button>
                             </div>
                         </div>
                     </div>
                 </div>
             </main>
-        </div>
-    </div>
-
-    <!-- Maintenance Dispatch Modal -->
-    <div class="modal-overlay" id="dispatch-modal">
-        <div class="modal-card" style="max-width: 500px;">
-            <div class="modal-header" style="background:#b91c1c; color:#fff;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span>🚨</span>
-                    <h3 style="color:#fff;">Emergency Technical Dispatch Order</h3>
-                </div>
-                <button type="button" class="modal-close-btn" style="color:#fff;"
-                    onclick="closeMaintenanceDispatchModal()">&times;</button>
-            </div>
-            <form id="dispatch-form" onsubmit="handleDispatchSubmit(event)">
-                <div class="modal-body">
-                    <div class="form-field">
-                        <label>Assigned Emergency Response Unit *</label>
-                        <select id="dispatch-team" required>
-                            <option value="HN-RAPID-01">Hanoi Rapid Response Unit - Eng. Nguyen Van Tuan</option>
-                            <option value="HP-DEPOT-02">Hai Phong Port Electrical &amp; Reefer Team - KS. Le Hoang
-                            </option>
-                            <option value="MOBILE-REEFER-03">Mobile Reefer Intervention Unit (Carrier Certified)
-                            </option>
-                        </select>
-                    </div>
-                    <div class="form-field">
-                        <label>Intervention Priority Level *</label>
-                        <select id="dispatch-priority">
-                            <option value="CRITICAL_HIGH">🔴 LEVEL 1 - HIGH VALUE VACCINES (Intervention ETA &lt; 15
-                                Mins)</option>
-                            <option value="URGENT_MED">🟠 LEVEL 2 - PHARMACEUTICAL DRUGS (ETA &lt; 30 Mins)</option>
-                            <option value="STANDARD">🟡 LEVEL 3 - PERISHABLE FROZEN ASSETS</option>
-                        </select>
-                    </div>
-                    <div class="form-field">
-                        <label>Dispatch Operational Instructions &amp; Action Notes</label>
-                        <textarea id="dispatch-notes" rows="3"
-                            style="width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:10px; font-family:inherit; font-size:13px;"
-                            placeholder="e.g., Carry R404A refrigerant cylinder, verify compressor fuse, and inspect door seal gasket."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary"
-                        onclick="closeMaintenanceDispatchModal()">Cancel</button>
-                    <button type="submit" class="btn btn-danger" style="background:#b91c1c;">⚡ Dispatch Emergency
-                        Response Unit</button>
-                </div>
-            </form>
         </div>
     </div>
 

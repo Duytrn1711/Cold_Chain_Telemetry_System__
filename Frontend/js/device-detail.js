@@ -7,7 +7,12 @@ let currentChart = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     const params = new URLSearchParams(window.location.search);
-    const devId = params.get("id") || "4";
+    const devId = params.get("id");
+
+    if (!devId) {
+        document.getElementById("detail-dev-token").textContent = "Select a device from the device list.";
+        return;
+    }
 
     await loadDeviceDetails(devId);
 
@@ -15,9 +20,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.onTelemetryLiveUpdate = (packet) => {
         if (packet.device_id == devId) {
             console.log("Live packet for this device:", packet);
+            if (!packet.persisted) return;
             const tempVal = parseFloat(packet.temperature);
+            const humidity = packet.humidity === null || packet.humidity === undefined ? "—" : `${Number(packet.humidity).toFixed(0)}%`;
             document.getElementById("detail-temp-val").textContent = `${tempVal.toFixed(1)}°C`;
-            document.getElementById("detail-hum-val").textContent = `${Math.round(packet.humidity || 75)}%`;
+            document.getElementById("detail-hum-val").textContent = humidity;
 
             const rawTbody = document.getElementById("detail-raw-tbody");
             if (rawTbody) {
@@ -26,7 +33,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     <tr style="background: rgba(37, 99, 235, 0.05); animation: pulse 1s;">
                         <td>#${packet.id} <span style="color:#2563eb; font-size:10px; font-weight:700;">LIVE</span></td>
                         <td><strong class="temp-display ${isSafe ? 'temp-safe' : 'temp-danger'}">${tempVal.toFixed(1)}°C</strong></td>
-                        <td>${Math.round(packet.humidity || 75)}%</td>
+                        <td>${humidity}</td>
                         <td>${new Date().toLocaleTimeString("en-US", { hour12: false })}</td>
                         <td><span class="badge ${isSafe ? 'badge-active' : 'badge-critical'}">${isSafe ? 'SAFE' : 'EXCURSION'}</span></td>
                     </tr>
@@ -52,7 +59,7 @@ async function loadDeviceDetails(devId) {
 
             if (dev.latestReading) {
                 document.getElementById("detail-temp-val").textContent = `${parseFloat(dev.latestReading.temperature).toFixed(1)}°C`;
-                document.getElementById("detail-hum-val").textContent = `${Math.round(dev.latestReading.humidity || 75)}%`;
+                document.getElementById("detail-hum-val").textContent = dev.latestReading.humidity === null ? "—" : `${Number(dev.latestReading.humidity).toFixed(0)}%`;
             }
 
             const rawTbody = document.getElementById("detail-raw-tbody");
@@ -64,7 +71,7 @@ async function loadDeviceDetails(devId) {
                         <tr>
                             <td>#${r.id}</td>
                             <td><strong class="temp-display ${isSafe ? 'temp-safe' : 'temp-danger'}">${temp.toFixed(1)}°C</strong></td>
-                            <td>${Math.round(r.humidity || 75)}%</td>
+                            <td>${r.humidity === null ? "—" : `${Number(r.humidity).toFixed(0)}%`}</td>
                             <td>${new Date(r.created_at).toLocaleString("en-US", { hour12: false })}</td>
                             <td><span class="badge ${isSafe ? 'badge-active' : 'badge-critical'}">${isSafe ? 'SAFE' : 'EXCURSION'}</span></td>
                         </tr>
@@ -93,11 +100,11 @@ function renderDetailChart(history) {
 
     const labels = history.length > 0 
         ? history.map(h => new Date(h.created_at).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" }))
-        : ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00"];
+        : [];
 
     const temps = history.length > 0
         ? history.map(h => parseFloat(h.temperature))
-        : [4.2, 4.5, 4.3, 7.5, 9.8, 10.8];
+        : [];
 
     currentChart = new Chart(ctx, {
         type: "line",

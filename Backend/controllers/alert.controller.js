@@ -11,6 +11,10 @@ exports.getAllAlerts = async (req, res) => {
                 a.device_id,
                 a.alert_type,
                 a.alert_content,
+                a.status,
+                a.acknowledged_by,
+                a.acknowledged_at,
+                a.resolved_at,
                 a.created_at,
                 dev.device_token,
                 dev.warehouse_id,
@@ -74,6 +78,10 @@ exports.getAlertById = async (req, res) => {
                 a.device_id,
                 a.alert_type,
                 a.alert_content,
+                a.status,
+                a.acknowledged_by,
+                a.acknowledged_at,
+                a.resolved_at,
                 a.created_at,
                 dev.device_token,
                 dev.warehouse_id,
@@ -118,6 +126,31 @@ exports.getAlertById = async (req, res) => {
             data: null,
             message: "Lỗi máy chủ khi lấy chi tiết cảnh báo"
         });
+    }
+};
+
+exports.updateAlertStatus = async (req, res) => {
+    const { id } = req.params;
+    const nextStatus = req.body.status === "RESOLVED" ? "RESOLVED" : "ACKNOWLEDGED";
+    try {
+        const result = await pool.query(`
+            UPDATE alert
+            SET status = $2,
+                acknowledged_by = COALESCE(acknowledged_by, $3),
+                acknowledged_at = COALESCE(acknowledged_at, CURRENT_TIMESTAMP),
+                resolved_at = CASE WHEN $2 = 'RESOLVED' THEN CURRENT_TIMESTAMP ELSE resolved_at END
+            WHERE id = $1 AND status <> 'RESOLVED'
+            RETURNING id, status, acknowledged_by, acknowledged_at, resolved_at
+        `, [id, nextStatus, req.user.id]);
+        if (!result.rowCount) {
+            const current = await pool.query("SELECT id, status FROM alert WHERE id = $1", [id]);
+            if (!current.rowCount) return res.status(404).json({ success: false, data: null, message: "Không tìm thấy cảnh báo" });
+            return res.json({ success: true, data: current.rows[0], message: "Cảnh báo đã được xử lý" });
+        }
+        return res.json({ success: true, data: result.rows[0], message: "Cập nhật trạng thái cảnh báo thành công" });
+    } catch (error) {
+        console.error("Alert status update error:", error);
+        return res.status(500).json({ success: false, data: null, message: "Không thể cập nhật trạng thái cảnh báo" });
     }
 };
 

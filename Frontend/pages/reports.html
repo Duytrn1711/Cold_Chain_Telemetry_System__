@@ -255,7 +255,7 @@
                         <div class="live-dot-pair"><span class="live-dot pulse"></span><span class="live-dot"></span>
                         </div>
                         <strong>Cold Chain Regulatory Suite</strong>
-                        <span>WHO PQS &amp; EU GDP Standards</span>
+                        <span>Database backed operational reports</span>
                     </div>
                     <div class="header-search">
                         <span class="search-icon-pos">🔍</span>
@@ -264,7 +264,7 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <div class="header-system-status"><span>Audit Integrity Level 4 · Verified</span></div>
+                        <div class="header-system-status"><span>PostgreSQL records</span></div>
                     <button type="button" class="header-action-btn" title="Notifications">🔔<span
                             class="header-badge-dot"></span></button>
                     <div class="header-avatar">
@@ -282,7 +282,7 @@
                     <div class="page-title-group">
                         <h2>
                             Cold Chain Reports &amp; Compliance Audits
-                            <span class="badge badge-online">● AUDIT READY</span>
+                            <span class="badge badge-neutral">Database report</span>
                         </h2>
                         <p>Regulatory compliance reports, excursion root-cause analysis, Mean Kinetic Temperature (MKT),
                             and executive audit exports</p>
@@ -296,9 +296,7 @@
                             <option value="month">Past 30 Days (Rolling)</option>
                             <option value="quarter">Q3 2026 Audit</option>
                         </select>
-                        <button type="button" class="btn btn-secondary" onclick="generateAuditCertificate()">
-                            🛡️ WHO Certificate
-                        </button>
+                        <button type="button" class="btn btn-secondary" disabled title="Certification evidence is not stored">Certification unavailable</button>
                         <button type="button" class="btn btn-primary" onclick="openGenerateReportModal()">
                             ➕ Generate New Report
                         </button>
@@ -312,8 +310,8 @@
                             <span class="stat-card-title">OVERALL GDP COMPLIANCE</span>
                             <div class="stat-card-icon icon-success">🛡️</div>
                         </div>
-                        <div class="stat-card-value" id="kpi-compliance-rate">98.4%</div>
-                        <div class="stat-card-footer"><span>Standard: WHO PQS target ≥98.0%</span></div>
+                        <div class="stat-card-value" id="kpi-compliance-rate">—</div>
+                        <div class="stat-card-footer"><span>Configured range: 2.0°C–8.0°C</span></div>
                     </div>
 
                     <div class="stat-card">
@@ -321,8 +319,8 @@
                             <span class="stat-card-title" style="color:#ef4444;">EXCURSION INCIDENTS</span>
                             <div class="stat-card-icon icon-danger">⚠️</div>
                         </div>
-                        <div class="stat-card-value" style="color:#ef4444;" id="kpi-excursions-total">4</div>
-                        <div class="stat-card-footer"><span>Avg MTTR: 14.2 min to nominal band</span></div>
+                        <div class="stat-card-value" style="color:#ef4444;" id="kpi-excursions-total">—</div>
+                        <div class="stat-card-footer"><span>From stored telemetry</span></div>
                     </div>
 
                     <div class="stat-card">
@@ -336,7 +334,7 @@
 
                     <div class="stat-card">
                         <div class="stat-card-header">
-                            <span class="stat-card-title" style="color:#8b5cf6;">CERTIFIED AUDIT REPORTS</span>
+                            <span class="stat-card-title" style="color:#8b5cf6;">REPORTABLE DATABASE RECORDS</span>
                             <div class="stat-card-icon">📑</div>
                         </div>
                         <div class="stat-card-value" style="color:#8b5cf6;" id="kpi-audit-count">18</div>

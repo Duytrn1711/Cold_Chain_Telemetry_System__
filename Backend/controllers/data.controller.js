@@ -4,11 +4,19 @@ const pool = require("../db");
 exports.getSummary = async (req, res) => {
     try {
         // Đếm số lượng thực thể
-        const [warehouseRes, vehicleRes, deviceRes, alertRes] = await Promise.all([
+        const [warehouseRes, vehicleRes, deviceRes, alertRes, shipmentRes] = await Promise.all([
             pool.query("SELECT COUNT(*) AS total, COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active FROM warehouse"),
-            pool.query("SELECT COUNT(*) AS total, COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active FROM delivery_vehicle"),
+            pool.query(`SELECT COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE status = 'ACTIVE') AS active,
+                (SELECT COUNT(DISTINCT vehicle_id) FROM agri_batches
+                    WHERE vehicle_id IS NOT NULL AND logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')) AS in_transit
+                FROM delivery_vehicle`),
             pool.query("SELECT COUNT(*) AS total, COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active FROM device"),
-            pool.query("SELECT COUNT(*) AS total FROM alert")
+            pool.query(`SELECT COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE UPPER(alert_type) LIKE '%HIGH%' OR UPPER(alert_type) LIKE '%CAO%' OR UPPER(alert_type) LIKE '%LOW%' OR UPPER(alert_type) LIKE '%THẤP%') AS critical,
+                COUNT(*) FILTER (WHERE UPPER(alert_type) NOT LIKE '%HIGH%' AND UPPER(alert_type) NOT LIKE '%CAO%' AND UPPER(alert_type) NOT LIKE '%LOW%' AND UPPER(alert_type) NOT LIKE '%THẤP%') AS warning
+                FROM alert`),
+            pool.query(`SELECT logistics_status, COUNT(*) AS count FROM agri_batches GROUP BY logistics_status`)
         ]);
 
         // Tính tỷ lệ tuân thủ nhiệt độ chuẩn (2.0°C - 8.0°C)
@@ -25,9 +33,9 @@ exports.getSummary = async (req, res) => {
 
         const totalReadings = parseInt(complianceRes.rows[0].total_readings || 0, 10);
         const compliantReadings = parseInt(complianceRes.rows[0].compliant_readings || 0, 10);
-        const complianceRate = totalReadings > 0 
-            ? ((compliantReadings / totalReadings) * 100).toFixed(1) 
-            : "96.4";
+        const complianceRate = totalReadings > 0
+            ? parseFloat(((compliantReadings / totalReadings) * 100).toFixed(1))
+            : null;
 
         // Lấy chuỗi dữ liệu 12 mốc thời gian gần nhất cho biểu đồ dashboard
         const chartRes = await pool.query(`
@@ -37,14 +45,28 @@ exports.getSummary = async (req, res) => {
                 d.humidity,
                 d.created_at,
                 dev.device_token,
-                COALESCE(w.warehouse_name, v.license_plate, 'Node #' || d.device_id) AS entity_name
+                COALESCE(w.warehouse_name, v.license_plate, dev.device_token) AS entity_name,
+                CASE WHEN v.id IS NOT NULL THEN 'vehicle' WHEN w.id IS NOT NULL THEN 'warehouse' ELSE 'device' END AS entity_type
             FROM data d
             JOIN device dev ON d.device_id = dev.id
             LEFT JOIN warehouse w ON dev.warehouse_id = w.id
             LEFT JOIN delivery_vehicle v ON dev.vehicle_id = v.id
-            ORDER BY d.created_at ASC
+            ORDER BY d.created_at DESC
             LIMIT 24
         `);
+
+        const latestChartPoints = [...chartRes.rows].reverse();
+        const activeDeviceRes = await pool.query(`
+            SELECT COUNT(*) FILTER (WHERE latest.temperature < 2 OR latest.temperature > 8 OR latest.humidity > 80) AS warning,
+                   COUNT(*) FILTER (WHERE latest.created_at IS NULL OR latest.created_at < CURRENT_TIMESTAMP - INTERVAL '1 hour') AS offline
+            FROM device dev
+            LEFT JOIN LATERAL (
+                SELECT temperature, humidity, created_at FROM data WHERE device_id = dev.id
+                ORDER BY created_at DESC LIMIT 1
+            ) latest ON TRUE
+            WHERE dev.status = 'ACTIVE'
+        `);
+        const shipmentCounts = Object.fromEntries(shipmentRes.rows.map(row => [row.logistics_status, parseInt(row.count, 10)]));
 
         return res.json({
             success: true,
@@ -56,27 +78,29 @@ exports.getSummary = async (req, res) => {
                 vehicles: {
                     total: parseInt(vehicleRes.rows[0].total || 0, 10),
                     active: parseInt(vehicleRes.rows[0].active || 0, 10),
-                    in_transit: 8,
-                    idle: 2
+                    in_transit: parseInt(vehicleRes.rows[0].in_transit || 0, 10),
+                    idle: Math.max(0, parseInt(vehicleRes.rows[0].total || 0, 10) - parseInt(vehicleRes.rows[0].in_transit || 0, 10))
                 },
                 devices: {
                     total: parseInt(deviceRes.rows[0].total || 0, 10),
                     active: parseInt(deviceRes.rows[0].active || 0, 10),
-                    warning: 1
+                    warning: parseInt(activeDeviceRes.rows[0].warning || 0, 10),
+                    offline: parseInt(activeDeviceRes.rows[0].offline || 0, 10)
                 },
                 alerts: {
                     total: parseInt(alertRes.rows[0].total || 0, 10),
-                    critical: 2,
-                    warning: 1
+                    critical: parseInt(alertRes.rows[0].critical || 0, 10),
+                    warning: parseInt(alertRes.rows[0].warning || 0, 10)
                 },
                 compliance: {
-                    rate: parseFloat(complianceRate),
-                    avg_temp: parseFloat(complianceRes.rows[0].avg_temp || 4.2).toFixed(1),
-                    avg_humidity: parseFloat(complianceRes.rows[0].avg_humidity || 75.0).toFixed(1),
+                    rate: complianceRate,
+                    avg_temp: complianceRes.rows[0].avg_temp === null ? null : parseFloat(complianceRes.rows[0].avg_temp).toFixed(1),
+                    avg_humidity: complianceRes.rows[0].avg_humidity === null ? null : parseFloat(complianceRes.rows[0].avg_humidity).toFixed(1),
                     high_excursions: parseInt(complianceRes.rows[0].high_excursions || 0, 10),
                     low_excursions: parseInt(complianceRes.rows[0].low_excursions || 0, 10)
                 },
-                chartPoints: chartRes.rows
+                agriBatches: shipmentCounts,
+                chartPoints: latestChartPoints
             },
             message: "Lấy dữ liệu tổng hợp thành công"
         });
@@ -200,11 +224,14 @@ exports.createData = async (req, res) => {
     try {
         const { device_id, temperature, humidity } = req.body;
 
-        if (!device_id || temperature === undefined) {
+        const tempValue = Number(temperature);
+        const humidityValue = humidity === undefined || humidity === null || humidity === "" ? null : Number(humidity);
+        if (!device_id || temperature === undefined || !Number.isFinite(tempValue) || tempValue < -100 || tempValue > 100 ||
+            (humidityValue !== null && (!Number.isFinite(humidityValue) || humidityValue < 0 || humidityValue > 100))) {
             return res.status(400).json({
                 success: false,
                 data: null,
-                message: "Vui lòng cung cấp device_id và nhiệt độ (temperature)"
+                message: "Provide a device_id, temperature from -100 to 100 °C, and optional humidity from 0 to 100%"
             });
         }
 
@@ -219,7 +246,7 @@ exports.createData = async (req, res) => {
                     INSERT INTO data (id, device_id, temperature, humidity, created_at)
                     VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
                     RETURNING *
-                `, [nextId, device_id, temperature, humidity || null]);
+                `, [nextId, device_id, tempValue, humidityValue]);
                 record = insertRes.rows[0];
                 break;
             } catch (err) {
@@ -232,7 +259,7 @@ exports.createData = async (req, res) => {
         }
 
         // Tự động kiểm tra ngưỡng nhiệt độ an toàn chuỗi lạnh (2.0°C - 8.0°C)
-        const tempVal = parseFloat(temperature);
+        const tempVal = tempValue;
         if (tempVal < 2.0 || tempVal > 8.0) {
             const isHigh = tempVal > 8.0;
             const alertType = isHigh ? "NHIỆT ĐỘ QUÁ CAO" : "NHIỆT ĐỘ QUÁ THẤP";
@@ -338,9 +365,9 @@ exports.getReportsData = async (req, res) => {
             const compliant = parseInt(w.compliant_readings, 10);
             const complianceRate = total > 0 
                 ? parseFloat(((compliant / total) * 100).toFixed(1)) 
-                : 100.0;
+                : null;
             // So với 98%: nếu >= 98% gán COMPLIANT, thấp hơn gán REVIEW REQUIRED
-            const status = complianceRate >= 98.0 ? "COMPLIANT" : "REVIEW REQUIRED";
+            const status = complianceRate === null ? "NO DATA" : complianceRate >= 98.0 ? "COMPLIANT" : "REVIEW REQUIRED";
 
             return {
                 id: `WH-${w.id}`,
@@ -352,10 +379,10 @@ exports.getReportsData = async (req, res) => {
                 readings: total,
                 compliant_readings: compliant,
                 compliance: complianceRate,
-                minTemp: total > 0 ? parseFloat(parseFloat(w.min_temp).toFixed(1)) : 0.0,
-                maxTemp: total > 0 ? parseFloat(parseFloat(w.max_temp).toFixed(1)) : 0.0,
+                minTemp: total > 0 ? parseFloat(parseFloat(w.min_temp).toFixed(1)) : null,
+                maxTemp: total > 0 ? parseFloat(parseFloat(w.max_temp).toFixed(1)) : null,
                 excursions: parseInt(w.excursion_readings || 0, 10),
-                mkt: total > 0 ? parseFloat(parseFloat(w.avg_temp).toFixed(1)) : 0.0,
+                mkt: total > 0 ? parseFloat(parseFloat(w.avg_temp).toFixed(1)) : null,
                 status
             };
         });
@@ -366,9 +393,9 @@ exports.getReportsData = async (req, res) => {
             const compliant = parseInt(v.compliant_readings, 10);
             const complianceRate = total > 0 
                 ? parseFloat(((compliant / total) * 100).toFixed(1)) 
-                : 100.0;
+                : null;
             // So với 98%: nếu >= 98% gán COMPLIANT, thấp hơn gán REVIEW REQUIRED
-            const status = complianceRate >= 98.0 ? "COMPLIANT" : "REVIEW REQUIRED";
+            const status = complianceRate === null ? "NO DATA" : complianceRate >= 98.0 ? "COMPLIANT" : "REVIEW REQUIRED";
 
             return {
                 id: `VEH-${v.id}`,
@@ -380,10 +407,10 @@ exports.getReportsData = async (req, res) => {
                 readings: total,
                 compliant_readings: compliant,
                 compliance: complianceRate,
-                minTemp: total > 0 ? parseFloat(parseFloat(v.min_temp).toFixed(1)) : 0.0,
-                maxTemp: total > 0 ? parseFloat(parseFloat(v.max_temp).toFixed(1)) : 0.0,
+                minTemp: total > 0 ? parseFloat(parseFloat(v.min_temp).toFixed(1)) : null,
+                maxTemp: total > 0 ? parseFloat(parseFloat(v.max_temp).toFixed(1)) : null,
                 excursions: parseInt(v.excursion_readings || 0, 10),
-                mkt: total > 0 ? parseFloat(parseFloat(v.avg_temp).toFixed(1)) : 0.0,
+                mkt: total > 0 ? parseFloat(parseFloat(v.avg_temp).toFixed(1)) : null,
                 status
             };
         });
@@ -396,12 +423,12 @@ exports.getReportsData = async (req, res) => {
         const totalExcursions = facilityAuditList.reduce((sum, r) => sum + r.excursions, 0);
         const overallComplianceRate = totalAllReadings > 0 
             ? parseFloat(((totalCompliantReadings / totalAllReadings) * 100).toFixed(1)) 
-            : 100.0;
+            : null;
 
-        const activeEntities = facilityAuditList.filter(r => r.readings > 0);
-        const overallAvgTemp = activeEntities.length > 0 
-            ? parseFloat((activeEntities.reduce((sum, r) => sum + r.mkt, 0) / activeEntities.length).toFixed(1))
-            : 4.5;
+        const activeEntities = facilityAuditList.filter(r => r.readings > 0 && r.mkt !== null);
+        const overallAvgTemp = totalAllReadings > 0
+            ? parseFloat((activeEntities.reduce((sum, r) => sum + r.mkt * r.readings, 0) / totalAllReadings).toFixed(1))
+            : null;
         const compliantAuditCount = facilityAuditList.filter(r => r.status === "COMPLIANT").length;
 
         return res.json({

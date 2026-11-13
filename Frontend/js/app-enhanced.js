@@ -61,8 +61,8 @@ function injectEnhancedUI() {
                 <form id="system-settings-form">
                     <div class="modal-body">
                         <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
-                            <strong style="font-size:12px; color:#1e40af;">PHARMACEUTICAL STORAGE COMPLIANCE (WHO PQS &amp; GDP)</strong>
-                            <p style="font-size:12px; color:#64748b; margin-top:2px;">Cold chain vaccine &amp; biological storage target: 2.0°C – 8.0°C.</p>
+                            <strong style="font-size:12px; color:#1e40af;">Configured temperature monitoring range</strong>
+                            <p style="font-size:12px; color:#64748b; margin-top:2px;">Threshold values apply to telemetry readings stored by this installation.</p>
                         </div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                             <div class="form-field">
@@ -146,26 +146,26 @@ function injectEnhancedUI() {
                     <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:16px;">
                         <div style="background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0;">
                             <div style="font-size:11px; color:#64748b; font-weight:700;">TRANSMITTER NODE</div>
-                            <strong id="insp-device-token" style="font-size:14px; color:#0f172a;">DEV-004</strong>
+                            <strong id="insp-device-token" style="font-size:14px; color:#0f172a;">—</strong>
                         </div>
                         <div style="background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0;">
                             <div style="font-size:11px; color:#64748b; font-weight:700;">TELEMETRY READING</div>
-                            <strong id="insp-reading-temp" style="font-size:14px; color:#ef4444;">10.8°C / 76% RH</strong>
+                            <strong id="insp-reading-temp" style="font-size:14px; color:#64748b;">—</strong>
                         </div>
                         <div style="background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0;">
                             <div style="font-size:11px; color:#64748b; font-weight:700;">CRC32 CHECKSUM</div>
-                            <strong style="font-size:14px; color:#10b981;">0xA4F912E8 (VALID)</strong>
+                            <strong style="font-size:14px; color:#64748b;">Not stored</strong>
                         </div>
                     </div>
 
                     <label style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase;">Raw Hexadecimal IoT Packet Payload (AES-256 Encrypted Frame)</label>
                     <div class="raw-hex-box" id="insp-hex-box">
-                        43 43 54 53 01 0A 04 2C 00 4C 03 E8 7F 2B 9C 00 12 AF DE 33 08 42 10 00 00 00 78 A4 F9 12 E8
+                        Raw packet payload is not stored in this database.
                     </div>
 
                     <div style="margin-top:14px; font-size:12px; color:#475569; display:flex; justify-content:space-between; border-top:1px solid #f1f5f9; padding-top:10px;">
-                        <span>Radio Protocol: <strong>NB-IoT / LTE Cat-M1 (Band 28)</strong></span>
-                        <span>Signal: <strong>-74 dBm (98% SNR)</strong></span>
+                        <span>Radio protocol: <strong>Not stored</strong></span>
+                        <span>Signal: <strong>Not stored</strong></span>
                     </div>
                 </div>
                 <div class="modal-footer" style="background:#f8fafc;">
@@ -201,33 +201,23 @@ function injectEnhancedUI() {
                             <div class="radar-pin-label" id="radar-center-label">Hub Center</div>
                         </div>
 
-                        <!-- Simulated Vehicle Pin 1 -->
-                        <div class="radar-pin" style="top:35%; left:65%;">
-                            <div class="radar-pin-dot" style="background:#38bdf8; box-shadow:0 0 8px #38bdf8;"></div>
-                            <div class="radar-pin-label">🚚 29A-12345 (In Transit)</div>
-                        </div>
-
-                        <!-- Simulated Vehicle Pin 2 -->
-                        <div class="radar-pin" style="top:68%; left:32%;">
-                            <div class="radar-pin-dot" style="background:#38bdf8; box-shadow:0 0 8px #38bdf8;"></div>
-                            <div class="radar-pin-label">🚚 29A-67890 (Docked)</div>
-                        </div>
+                        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px;">No GPS points are stored</div>
                     </div>
 
                     <div style="display:flex; flex-direction:column; gap:12px;">
                         <div style="background:#1e293b; padding:12px; border-radius:8px; font-size:12px;">
                             <div style="color:#94a3b8; font-size:10px; font-weight:700;">COORDINATES</div>
-                            <div id="radar-coords-val" style="font-size:14px; font-weight:700; color:#38bdf8; margin-top:2px;">21.0285° N, 105.8542° E</div>
+                            <div id="radar-coords-val" style="font-size:14px; font-weight:700; color:#38bdf8; margin-top:2px;">Coordinates not recorded</div>
                         </div>
                         <div style="background:#1e293b; padding:12px; border-radius:8px; font-size:12px;">
                             <div style="color:#94a3b8; font-size:10px; font-weight:700;">GEOFENCE STATUS</div>
-                            <div style="color:#10b981; font-weight:700; margin-top:2px;">● All Assets Within Safe Operational Corridor</div>
+                            <div style="color:#94a3b8; font-weight:700; margin-top:2px;">Geofence status not recorded</div>
                         </div>
                         <div style="background:#1e293b; padding:12px; border-radius:8px; font-size:12px;">
                             <div style="color:#94a3b8; font-size:10px; font-weight:700;">SATELLITE TELEMETRY</div>
-                            <div style="color:#e2e8f0; margin-top:2px;">Constellation: GPS + Galileo (12 Sats locked, HDOP 0.8)</div>
+                            <div style="color:#e2e8f0; margin-top:2px;">GPS telemetry is not stored</div>
                         </div>
-                        <button type="button" class="btn btn-primary" style="margin-top:auto;" onclick="showToast('Satellite synchronization ping dispatched successfully!', 'success')">
+                        <button type="button" class="btn btn-primary" style="margin-top:auto;" disabled title="GPS command integration is not configured">
                             🔄 Ping Satellites Now
                         </button>
                     </div>
@@ -342,38 +332,17 @@ function initNotificationsDrawer() {
         <div class="dropdown-header" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <strong style="font-size:13px; color:#0f172a;">Live Alerts &amp; Incidents</strong>
-                <span class="badge badge-critical" style="font-size:10px; margin-left:6px;" id="notif-count-badge">3 Active</span>
+                <span class="badge badge-critical" style="font-size:10px; margin-left:6px;" id="notif-count-badge">0</span>
             </div>
-            <a href="#" style="font-size:11px; color:#2563eb; text-decoration:none;" onclick="markAllNotifsRead(); return false;">Mark all read</a>
+            <span style="font-size:11px; color:#64748b;">Latest database alerts</span>
         </div>
-        <div class="notification-list" id="notification-items-list">
-            <div class="notification-item critical" onclick="goToAlertsPage()">
-                <div class="notification-icon">🛑</div>
-                <div class="notification-content">
-                    <div class="notification-title">Vehicle 29A-12345: Temperature Excursion (10.8°C)</div>
-                    <div class="notification-time">2 mins ago · Route Hanoi - Bac Ninh</div>
-                </div>
-            </div>
-            <div class="notification-item" onclick="goToAlertsPage()">
-                <div class="notification-icon">⚠️</div>
-                <div class="notification-content">
-                    <div class="notification-title">Vehicle 30H-88921: High Chamber Humidity (87% RH)</div>
-                    <div class="notification-time">12 mins ago · Vaccine Reefer B</div>
-                </div>
-            </div>
-            <div class="notification-item" onclick="goToAlertsPage()">
-                <div class="notification-icon">🛡️</div>
-                <div class="notification-content">
-                    <div class="notification-title">Hanoi Central Hub WH-01: Auto-defrost cycle complete</div>
-                    <div class="notification-time">35 mins ago · Chamber Zone 3</div>
-                </div>
-            </div>
-        </div>
+        <div class="notification-list" id="notification-items-list"><div style="padding:24px;text-align:center;color:#64748b">Loading alerts…</div></div>
         <div style="padding:10px 16px; background:#f8fafc; border-top:1px solid #e2e8f0; text-align:center;">
             <a href="#" style="font-size:12px; font-weight:700; color:#2563eb; text-decoration:none;" onclick="goToAlertsPage(); return false;">Open Incident Center →</a>
         </div>
     `;
     wrapper.appendChild(menu);
+    loadNotificationAlerts();
 
     notifBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -406,6 +375,19 @@ function goToAlertsPage() {
     closeMenus();
     const isSub = window.location.pathname.includes("/pages/");
     window.location.href = isSub ? "alerts.html" : "pages/alerts.html";
+}
+
+async function loadNotificationAlerts() {
+    const list = document.getElementById("notification-items-list");
+    const badge = document.getElementById("notif-count-badge");
+    if (!list) return;
+    try {
+        const response = await api.get("/alerts");
+        const alerts = Array.isArray(response.data) ? response.data : (Array.isArray(response.data?.list) ? response.data.list : []);
+        const safe = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        if (badge) badge.textContent = String(alerts.filter(a => a.status !== "RESOLVED").length);
+        list.innerHTML = alerts.length ? alerts.slice(0, 10).map(a => `<div class="notification-item ${String(a.alert_type || "").toUpperCase().includes("HIGH") ? "critical" : ""}" onclick="goToAlertsPage()"><div class="notification-icon">⚠️</div><div class="notification-content"><div class="notification-title">${safe(a.alert_type || "Alert")} · ${safe(a.alert_content || "")}</div><div class="notification-time">${a.created_at ? new Date(a.created_at).toLocaleString() : ""}</div></div></div>`).join("") : `<div style="padding:24px;text-align:center;color:#64748b">No alerts in the database</div>`;
+    } catch (error) { list.innerHTML = `<div style="padding:24px;text-align:center;color:#64748b">Could not load alerts</div>`; }
 }
 
 function markAllNotifsRead() {
@@ -466,7 +448,7 @@ const COMMAND_ACTIONS = [
     { name: "IoT Sensor Devices & Nodes", category: "NAVIGATION", icon: "📡", action: () => navigateToPage("devices") },
     { name: "Telemetry Data & Raw Streams", category: "NAVIGATION", icon: "📈", action: () => navigateToPage("data") },
     { name: "Cold Chain Reports & Audits", category: "NAVIGATION", icon: "📑", action: () => navigateToPage("reports") },
-    { name: "Generate WHO & ISO 9001 Compliance Certificate (PDF)", category: "REPORTS", icon: "🛡️", need: "export", action: () => generateAuditCertificate() },
+    { name: "Certification evidence unavailable", category: "REPORTS", icon: "🛡️", need: "export", action: () => showToast("Certification evidence is not stored", "warning") },
     { name: "Configure Safe Temperature Thresholds", category: "SYSTEM", icon: "⚙️", need: "settings", action: () => openSettingsModal() },
     { name: "Change User Password", category: "ACCOUNT", icon: "🔑", action: () => openChangePwdModal() }
 ];
@@ -633,37 +615,30 @@ window.closeChangePwdModal = function() {
 };
 
 // --- 7. TELEMETRY PACKET INSPECTOR ---
-window.openPacketInspector = function(packet) {
+window.openPacketInspector = function(packet = {}) {
     const modal = document.getElementById("packet-inspector-modal");
     if (!modal) return;
-
-    const devToken = packet.device_token || packet.dev_code || `DEV-00${packet.device_id || 4}`;
-    const temp = packet.temperature || packet.temp || "10.8";
-    const hum = packet.humidity || packet.hum || "76";
-    const id = packet.id || Math.floor(800000 + Math.random() * 90000);
-
-    document.getElementById("inspector-title").textContent = `Diagnostic Packet Inspector: TL-${id}`;
-    document.getElementById("insp-device-token").textContent = devToken;
-    document.getElementById("insp-reading-temp").textContent = `${parseFloat(temp).toFixed(1)}°C / ${hum}% RH`;
-    
-    const hex = `43 43 54 53 01 0A 04 2C 00 ${Number(id).toString(16).toUpperCase().padStart(4, '0')} 03 E8 7F 2B 9C 00 12 AF DE 33 08 42 10 00 00 00 78 A4 F9 12 E8`;
-    document.getElementById("insp-hex-box").textContent = hex;
-
+    const id = packet.id ?? "—";
+    const temp = packet.temperature ?? packet.temp;
+    const humidity = packet.humidity ?? packet.hum;
+    document.getElementById("inspector-title").textContent = `Telemetry record: ${id}`;
+    document.getElementById("insp-device-token").textContent = packet.device_token || packet.dev_code || packet.device_id || "—";
+    document.getElementById("insp-reading-temp").textContent = `${temp == null ? "—" : `${Number(temp).toFixed(1)}°C`} / ${humidity == null ? "—" : `${Number(humidity).toFixed(1)}% RH`}`;
+    document.getElementById("insp-hex-box").textContent = "Raw packet payload is not stored in this database.";
     modal.classList.add("show");
-};
-window.closePacketInspector = function() {
+};window.closePacketInspector = function() {
     const modal = document.getElementById("packet-inspector-modal");
     if (modal) modal.classList.remove("show");
 };
 
 // --- 8. GPS RADAR TRACKING MODAL ---
-window.openGpsRadarModal = function(name = "Hanoi Central Hub", coords = "21.0285° N, 105.8542° E") {
+window.openGpsRadarModal = function(name = "Location", coords = null) {
     const modal = document.getElementById("gps-radar-modal");
     if (!modal) return;
 
     document.getElementById("radar-facility-name").textContent = `${name} - GPS Tracking`;
     document.getElementById("radar-center-label").textContent = name;
-    document.getElementById("radar-coords-val").textContent = coords;
+    document.getElementById("radar-coords-val").textContent = coords || "Coordinates not recorded";
 
     modal.classList.add("show");
 };
@@ -674,78 +649,11 @@ window.closeGpsRadarModal = function() {
 
 window.showGpsRadarModal = window.openGpsRadarModal;
 
-// --- 9. ISO 9001 / GDP AUDIT CERTIFICATE GENERATOR ---
-window.generateAuditCertificate = function(targetName = "National Cold Chain Network") {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-        showToast("Please allow popups to view compliance certificate!", "warning");
-        return;
-    }
-
-    const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    const hash = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-
-    const certHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Cold Chain Compliance Audit Certificate - ISO 9001 / GDP</title>
-            <style>
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #0f172a; max-width: 800px; margin: auto; border: 12px solid #e2e8f0; border-radius: 8px; }
-                .cert-header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 24px; }
-                .cert-title { font-size: 26px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 1px; }
-                .cert-subtitle { font-size: 13px; color: #64748b; margin-top: 6px; }
-                .cert-body { line-height: 1.8; font-size: 14px; }
-                .cert-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 13px; }
-                .cert-table th, .cert-table td { border: 1px solid #cbd5e1; padding: 10px 14px; text-align: left; }
-                .cert-table th { background: #f8fafc; font-weight: 700; color: #334155; }
-                .cert-stamp { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; padding-top: 20px; }
-                .seal-box { border: 2px dashed #2563eb; padding: 16px; border-radius: 8px; text-align: center; color: #2563eb; font-weight: 700; font-size: 12px; }
-                @media print { body { border: none; padding: 0; } }
-            </style>
-        </head>
-        <body>
-            <div class="cert-header">
-                <div style="font-size:36px; margin-bottom:8px;">❄️</div>
-                <div class="cert-title">Cold Chain Compliance Certificate</div>
-                <div class="cert-subtitle">WHO PQS / GDP Good Distribution Practice &amp; ISO 9001:2015 Audit Certification</div>
-            </div>
-            <div class="cert-body">
-                <p>This document certifies that <strong>${targetName}</strong> has maintained continuous temperature compliance within the validated target range of <strong>2.0°C to 8.0°C</strong> for pharmaceutical, vaccine, and perishable cold chain assets.</p>
-                
-                <table class="cert-table">
-                    <tr><th>Parameter</th><th>Audit Metric</th><th>Compliance Status</th></tr>
-                    <tr><td>Monitored Probes</td><td>24 Deployed IoT Transmitters</td><td>100% Calibrated</td></tr>
-                    <tr><td>Active Fleet Reefer Units</td><td>10 Refrigerated Vehicles</td><td>Active Geofence Tracking</td></tr>
-                    <tr><td>Monitored Facilities</td><td>5 Regional Cold Hubs</td><td>Nominal (WHO GDP Standard)</td></tr>
-                    <tr><td>Compliance Ratio</td><td>98.8% Time-in-Range (TIR)</td><td><strong>PASSED (CLASS A)</strong></td></tr>
-                    <tr><td>Cryptographic Hash</td><td>SHA-256: ${hash}</td><td>Digitally Signed</td></tr>
-                    <tr><td>Audit Date</td><td>${dateStr}</td><td>Official Validated Record</td></tr>
-                </table>
-
-                <p style="font-size:12px; color:#64748b;">Issued automatically by Cold Chain Telemetry Management System Core Engine. All logged temperature excursions are archived with mandatory standard operating procedure (SOP) response workflows.</p>
-            </div>
-            <div class="cert-stamp">
-                <div class="seal-box">
-                    ★ VALIDATED COLD CHAIN ★<br>GDP PHARMA CERTIFIED<br>ID: CC-AUDIT-${hash.slice(0, 8)}
-                </div>
-                <div style="text-align:right;">
-                    <div style="font-size:12px; color:#64748b;">Chief Compliance Officer</div>
-                    <div style="font-weight:700; margin-top:30px; font-size:14px;">Dr. Le Minh Tuan, Ph.D</div>
-                    <div style="font-size:11px; color:#94a3b8;">Department of Quality Assurance</div>
-                </div>
-            </div>
-            <div style="text-align:center; margin-top:30px;">
-                <button onclick="window.print()" style="padding:10px 24px; background:#2563eb; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Print Certificate / Save PDF</button>
-            </div>
-        </body>
-        </html>
-    `;
-
-    printWindow.document.write(certHtml);
-    printWindow.document.close();
-    showToast("Generated WHO / GDP Compliance Certificate!", "success");
+window.generateAuditCertificate = function() {
+    showToast("Certification evidence is not stored in this system, so no certificate can be issued.", "warning");
 };
+
+// Reports display measured database data and do not issue compliance certificates.
 
 // --- 10. AUTO REFRESH HOOK ---
 function initAutoRefresh() {

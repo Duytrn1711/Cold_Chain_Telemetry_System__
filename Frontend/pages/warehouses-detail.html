@@ -198,7 +198,7 @@
         });
 
         function showFacilityAudit() {
-            const whName = currentWarehouseData ? currentWarehouseData.warehouse_name : "Hanoi Central Cold Storage";
+            const whName = currentWarehouseData ? currentWarehouseData.warehouse_name : "Warehouse";
             if (typeof window.generateAuditCertificate === "function") {
                 window.generateAuditCertificate(`Facility Cold Storage: ${whName}`);
             } else {
@@ -207,7 +207,7 @@
         }
 
         function showWarehouseRadar() {
-            const whName = currentWarehouseData ? currentWarehouseData.warehouse_name : "Hanoi Central Cold Storage";
+            const whName = currentWarehouseData ? currentWarehouseData.warehouse_name : "Warehouse";
             if (typeof window.showGpsRadarModal === "function") {
                 window.showGpsRadarModal(whName);
             } else {

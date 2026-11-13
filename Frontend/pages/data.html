@@ -297,17 +297,16 @@
                     <div class="page-title-group">
                         <h2>
                             Telemetry Data Stream
-                            <span class="badge badge-active" id="badge-stream-state">● REALTIME STREAM</span>
+                            <span class="badge badge-neutral" id="badge-stream-state">DATABASE READINGS</span>
                         </h2>
-                        <p>Granular time-series sensor telemetry, live temperature/humidity streams, and packet
-                            telemetry diagnostics</p>
+                        <p>Temperature and humidity measurements recorded for registered cold-chain devices.</p>
                     </div>
 
                     <div class="page-actions-group">
                         <button type="button" class="btn btn-secondary" id="btn-toggle-stream"
-                            onclick="toggleTelemetryStreaming()">
-                            <span id="stream-toggle-icon">🟢</span>
-                            <span id="stream-toggle-text">Stream: Active</span>
+                            onclick="initTelemetryPage()">
+                            <span>↻</span>
+                            <span>Refresh data</span>
                         </button>
                         <button type="button" class="btn btn-secondary" onclick="openIngestModal()" data-role="write">
                             ➕ Ingest Reading
@@ -325,8 +324,8 @@
                             <span class="stat-card-title">ACTIVE TRANSMITTING NODES</span>
                             <div class="stat-card-icon">📡</div>
                         </div>
-                        <div class="stat-card-value" id="stat-active-nodes">14 / 14</div>
-                        <div class="stat-card-footer"><span>Mesh network online · 100% reachable</span></div>
+                        <div class="stat-card-value" id="stat-active-nodes">—</div>
+                        <div class="stat-card-footer"><span>Registered active devices</span></div>
                     </div>
 
                     <div class="stat-card">
@@ -334,7 +333,7 @@
                             <span class="stat-card-title">NOMINAL RANGE COMPLIANCE</span>
                             <div class="stat-card-icon icon-success">🌡️</div>
                         </div>
-                        <div class="stat-card-value" id="stat-compliance-rate">97.8% <span
+                        <div class="stat-card-value" id="stat-compliance-rate">— <span
                                 style="font-size:12px; color:#10b981;">Target ≥99%</span></div>
                         <div class="stat-card-footer"><span>Safe standard: 2.0°C to 8.0°C</span></div>
                     </div>
@@ -344,9 +343,8 @@
                             <span class="stat-card-title" style="color:#ef4444;">ACTIVE EXCURSIONS</span>
                             <div class="stat-card-icon icon-danger">⚠️</div>
                         </div>
-                        <div class="stat-card-value" style="color:#ef4444;" id="stat-excursions-count">1</div>
-                        <div class="stat-card-footer"><span id="stat-excursion-detail" style="color:#b91c1c;">Vehicle
-                                29A-12345 (10.8°C)</span></div>
+                        <div class="stat-card-value" style="color:#ef4444;" id="stat-excursions-count">—</div>
+                        <div class="stat-card-footer"><span id="stat-excursion-detail" style="color:#64748b;">No database alert details</span></div>
                     </div>
 
                     <div class="stat-card">
@@ -354,8 +352,8 @@
                             <span class="stat-card-title" style="color:#2563eb;">INGESTION &amp; PACKET RATE</span>
                             <div class="stat-card-icon icon-info">⚡</div>
                         </div>
-                        <div class="stat-card-value" style="color:#2563eb;" id="stat-ingest-rate">42 pkts/min</div>
-                        <div class="stat-card-footer"><span>Avg latency 14ms · Drop rate 0.00%</span></div>
+                        <div class="stat-card-value" style="color:#2563eb;" id="stat-ingest-rate">—</div>
+                        <div class="stat-card-footer"><span>No ingestion latency metrics are stored</span></div>
                     </div>
                 </div>
 
@@ -370,7 +368,7 @@
                                     &amp; delivery fleet (Safe band: 2°C - 8°C)</div>
                             </div>
                             <div style="display:flex; align-items:center; gap:8px;">
-                                <span class="badge badge-active" style="font-size:11px;">● LIVE CURVE</span>
+                                <span class="badge badge-neutral" style="font-size:11px;">PostgreSQL readings</span>
                                 <button type="button" class="btn btn-secondary" style="padding:4px 8px; font-size:12px;"
                                     onclick="refreshTelemetryChart()">🔄</button>
                             </div>
@@ -466,8 +464,7 @@
                     <div class="table-pagination">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="color:#2563eb; font-size:14px;">●</span>
-                            <span id="stream-diagnostics-text">Active stream connected. Latency 14ms · CRC32
-                                Verified.</span>
+                            <span id="stream-diagnostics-text">Showing measurements persisted in PostgreSQL.</span>
                         </div>
                         <div class="pagination-controls">
                             <span style="color:#64748b; font-size:12px; margin-right:12px;"

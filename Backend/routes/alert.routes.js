@@ -6,6 +6,7 @@ const { verifyToken, requireMinRole } = authController;
 
 router.get("/", alertController.getAllAlerts);
 router.get("/:id", alertController.getAlertById);
+router.patch("/:id/status", authController.verifyToken, requireMinRole("MANAGER"), alertController.updateAlertStatus);
 router.post("/", verifyToken, requireMinRole("MANAGER"), alertController.createAlert);
 router.delete("/:id", verifyToken, requireMinRole("MANAGER"), alertController.deleteAlert);
 

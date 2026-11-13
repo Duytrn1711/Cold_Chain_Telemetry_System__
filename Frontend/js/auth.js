@@ -3,6 +3,7 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
+    initLoginRegistrationViews();
     // 1. Logic cho trang Login (nếu có form login)
     const loginForm = document.getElementById("login-form");
     if (loginForm) {
@@ -90,6 +91,68 @@ document.addEventListener("DOMContentLoaded", () => {
     initProtectedPage();
 });
 
+function initLoginRegistrationViews() {
+    const loginView = document.getElementById("login-view");
+    const registerView = document.getElementById("register-view");
+    if (!loginView || !registerView) return;
+
+    const loginTab = document.getElementById("show-login-tab");
+    const registerTab = document.getElementById("show-register-tab");
+    const showView = (name) => {
+        const registering = name === "register";
+        loginView.hidden = registering;
+        registerView.hidden = !registering;
+        loginView.classList.toggle("active", !registering);
+        registerView.classList.toggle("active", registering);
+        loginTab.classList.toggle("active", !registering);
+        registerTab.classList.toggle("active", registering);
+        loginTab.setAttribute("aria-selected", String(!registering));
+        registerTab.setAttribute("aria-selected", String(registering));
+        document.getElementById(registering ? "register-full-name" : "username").focus();
+    };
+
+    loginTab.addEventListener("click", () => showView("login"));
+    registerTab.addEventListener("click", () => showView("register"));
+    document.querySelectorAll("[data-show-register]").forEach((button) => button.addEventListener("click", () => showView("register")));
+    document.querySelectorAll("[data-show-login]").forEach((button) => button.addEventListener("click", () => showView("login")));
+
+    const registerForm = document.getElementById("register-form");
+    const registerError = document.getElementById("register-error");
+    const registerSuccess = document.getElementById("register-success");
+    const submitButton = document.getElementById("register-submit-btn");
+    registerForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        registerError.textContent = "";
+        registerError.style.display = "none";
+        registerSuccess.textContent = "";
+
+        const password = document.getElementById("register-password").value;
+        const confirmPassword = document.getElementById("register-confirm-password").value;
+        if (password !== confirmPassword) {
+            registerError.textContent = "Mật khẩu xác nhận chưa khớp.";
+            registerError.style.display = "block";
+            return;
+        }
+
+        const formData = new FormData(registerForm);
+        const payload = Object.fromEntries(formData.entries());
+        try {
+            submitButton.disabled = true;
+            submitButton.innerHTML = "Đang gửi yêu cầu…";
+            const response = await api.post("/auth/register", payload);
+            if (!response.success) throw new Error(response.message || "Không thể gửi yêu cầu đăng ký.");
+            registerForm.reset();
+            registerSuccess.textContent = response.message || "Yêu cầu đã được gửi. Vui lòng chờ admin phê duyệt.";
+        } catch (error) {
+            registerError.textContent = error.message || "Không thể kết nối đến máy chủ.";
+            registerError.style.display = "block";
+        } finally {
+            submitButton.disabled = false;
+            submitButton.innerHTML = "<span>Gửi yêu cầu đăng ký</span>";
+        }
+    });
+}
+
 function initProtectedPage() {
     // Skip auth check if on login page
     if (window.location.pathname.endsWith("login.html") || window.location.pathname === "/") {
@@ -129,21 +192,3 @@ function initProtectedPage() {
         });
     }
 }
-
-// Global quick fill helper for demo logins
-window.quickFillLogin = function(u, p, autoSubmit = false) {
-    const uInput = document.getElementById("username");
-    const pInput = document.getElementById("password");
-    if (uInput && pInput) {
-        uInput.value = u;
-        pInput.value = p;
-        showToast(`Selected account: ${u}`, "success");
-        if (autoSubmit) {
-            const submitBtn = document.getElementById("login-submit-btn");
-            if (submitBtn) {
-                setTimeout(() => submitBtn.click(), 100);
-            }
-        }
-    }
-};
-

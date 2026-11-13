@@ -17,7 +17,12 @@ exports.getAllVehicles = async (req, res) => {
                 d.device_token,
                 dt.temperature,
                 dt.humidity,
-                dt.created_at AS last_ping_time
+                dt.created_at AS last_ping_time,
+                shipment.external_batch_code AS active_batch_code,
+                shipment.logistics_status AS shipment_status,
+                shipment.inspection_decision,
+                shipment.pickup_address AS shipment_pickup_address,
+                CASE WHEN shipment.inspection_decision = 'REJECTED' THEN shipment.pickup_address ELSE shipment.consumption_address END AS shipment_destination
             FROM delivery_vehicle v
             LEFT JOIN warehouse w ON v.warehouse_id = w.id
             LEFT JOIN device d ON d.vehicle_id = v.id
@@ -26,6 +31,12 @@ exports.getAllVehicles = async (req, res) => {
                 FROM data
                 ORDER BY device_id, created_at DESC
             ) dt ON dt.device_id = d.id
+            LEFT JOIN LATERAL (
+                SELECT external_batch_code, logistics_status, inspection_decision, pickup_address, consumption_address
+                FROM agri_batches
+                WHERE vehicle_id = v.id AND logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
+                ORDER BY updated_at DESC LIMIT 1
+            ) shipment ON TRUE
             WHERE 1=1
         `;
         const params = [];
@@ -92,6 +103,16 @@ exports.getVehicleById = async (req, res) => {
 
         const vehicle = vehicleRes.rows[0];
 
+        const shipmentRes = await pool.query(`
+            SELECT id, external_batch_code, product_name, producer_name, inspection_decision,
+                logistics_status, pickup_address,
+                CASE WHEN inspection_decision = 'REJECTED' THEN pickup_address ELSE consumption_address END AS destination_address,
+                quantity, unit, updated_at
+            FROM agri_batches
+            WHERE vehicle_id = $1 AND logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
+            ORDER BY updated_at DESC LIMIT 1
+        `, [id]);
+
         // Lấy tất cả thiết bị gán trên xe
         const deviceRes = await pool.query(`
             SELECT id, device_token, status, created_at
@@ -128,7 +149,8 @@ exports.getVehicleById = async (req, res) => {
                 devices: deviceRes.rows,
                 latestReading,
                 telemetryHistory,
-                recentPings: telemetryHistory.slice().reverse()
+                recentPings: telemetryHistory.slice().reverse(),
+                currentShipment: shipmentRes.rows[0] || null
             },
             message: "Lấy chi tiết xe tải thành công"
         });

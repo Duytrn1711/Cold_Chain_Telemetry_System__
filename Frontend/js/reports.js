@@ -57,7 +57,7 @@ function updateExecutiveKPIs(overall) {
 
     const rateEl = document.getElementById("kpi-compliance-rate");
     if (rateEl) {
-        rateEl.textContent = `${overall.complianceRate.toFixed(1)}%`;
+        rateEl.textContent = overall.complianceRate == null ? "—" : `${overall.complianceRate.toFixed(1)}%`;
     }
 
     const excEl = document.getElementById("kpi-excursions-total");
@@ -67,7 +67,7 @@ function updateExecutiveKPIs(overall) {
 
     const mktEl = document.getElementById("kpi-mkt-value");
     if (mktEl) {
-        mktEl.textContent = `+${overall.avgTemp.toFixed(1)}°C`;
+        mktEl.textContent = overall.avgTemp == null ? "—" : `${overall.avgTemp.toFixed(1)}°C`;
     }
 
     const auditCountEl = document.getElementById("kpi-audit-count");
@@ -96,8 +96,8 @@ function renderFacilityAuditTable() {
 
     tbody.innerHTML = facilityAuditList.map(row => {
         const isCompliant = row.status === "COMPLIANT";
-        const badgeClass = isCompliant ? "badge-online" : "badge-critical";
-        const rateColor = row.compliance >= 98.0 ? "#10b981" : (row.compliance >= 95.0 ? "#f59e0b" : "#ef4444");
+        const badgeClass = row.status === "NO DATA" ? "badge-neutral" : (isCompliant ? "badge-online" : "badge-critical");
+        const rateColor = row.compliance == null ? "#64748b" : (row.compliance >= 98.0 ? "#10b981" : (row.compliance >= 95.0 ? "#f59e0b" : "#ef4444"));
 
         return `
             <tr>
@@ -114,11 +114,11 @@ function renderFacilityAuditTable() {
                 <td style="font-family:'JetBrains Mono',monospace; font-size:12px;">${row.readings.toLocaleString()}</td>
                 <td>
                     <strong style="color:${rateColor}; font-size:13px; font-family:'JetBrains Mono',monospace;">
-                        ${row.compliance.toFixed(1)}%
+                        ${row.compliance == null ? "—" : `${row.compliance.toFixed(1)}%`}
                     </strong>
                 </td>
                 <td style="font-size:12px; font-family:'JetBrains Mono',monospace; color:#475569;">
-                    ${row.minTemp.toFixed(1)}°C - <span style="color:${row.maxTemp > 8.0 ? '#ef4444' : '#475569'}; font-weight:${row.maxTemp > 8.0 ? '700' : '400'}">${row.maxTemp.toFixed(1)}°C</span>
+                    ${row.minTemp == null ? "—" : `${row.minTemp.toFixed(1)}°C`} - <span style="color:${row.maxTemp > 8.0 ? '#ef4444' : '#475569'}; font-weight:${row.maxTemp > 8.0 ? '700' : '400'}">${row.maxTemp == null ? "—" : `${row.maxTemp.toFixed(1)}°C`}</span>
                 </td>
                 <td>
                     <span style="font-weight:700; color:${row.excursions > 0 ? '#ef4444' : '#10b981'};">
@@ -126,7 +126,7 @@ function renderFacilityAuditTable() {
                     </span>
                 </td>
                 <td style="font-family:'JetBrains Mono',monospace; font-size:12px;">
-                    +${row.mkt.toFixed(1)}°C
+                    ${row.mkt == null ? "—" : `${row.mkt.toFixed(1)}°C`}
                 </td>
                 <td>
                     <span class="badge ${badgeClass}">${row.status}</span>
@@ -168,11 +168,11 @@ function exportFacilityAuditReport() {
         r.sensors,
         r.readings,
         r.compliant_readings !== undefined ? r.compliant_readings : "",
-        r.compliance.toFixed(1),
-        r.minTemp.toFixed(1),
-        r.maxTemp.toFixed(1),
+        r.compliance == null ? "" : r.compliance.toFixed(1),
+        r.minTemp == null ? "" : r.minTemp.toFixed(1),
+        r.maxTemp == null ? "" : r.maxTemp.toFixed(1),
         r.excursions,
-        r.mkt.toFixed(1),
+        r.mkt == null ? "" : r.mkt.toFixed(1),
         `"${r.status}"`
     ]);
 
@@ -202,10 +202,10 @@ function downloadReportDoc(docName, format) {
         const rows = [
             ["Cold Chain Telemetry Management System - Official Audit Record"],
             [`Entity: ${item ? item.name : docName}`, `Category: ${item ? item.category : ''}`, `Date: ${new Date().toISOString()}`],
-            ["Target Standard: WHO PQS & EU GDP Pharma Grade (2.0°C - 8.0°C)"],
-            [`Compliance Rate: ${item ? item.compliance.toFixed(1) + '%' : 'N/A'}`, `Audit Status: ${item ? item.status : 'N/A'}`],
-            [`Total Readings: ${item ? item.readings : 0}`, `Excursions: ${item ? item.excursions : 0}`, `MKT: +${item ? item.mkt.toFixed(1) + '°C' : ''}`],
-            [`Sensor Nodes: ${item ? item.sensors : 0}`, `Recorded Range: ${item ? item.minTemp.toFixed(1) + '°C to ' + item.maxTemp.toFixed(1) + '°C' : ''}`]
+            ["Configured Temperature Range: 2.0°C - 8.0°C"],
+            [`Compliance Rate: ${item ? item.compliance == null ? "N/A" : item.compliance.toFixed(1) + '%' : 'N/A'}`, `Audit Status: ${item ? item.status : 'N/A'}`],
+            [`Total Readings: ${item ? item.readings : 0}`, `Excursions: ${item ? item.excursions : 0}`, `Average: ${item && item.mkt != null ? item.mkt.toFixed(1) + '°C' : 'N/A'}`],
+            [`Sensor Nodes: ${item ? item.sensors : 0}`, `Recorded Range: ${item && item.minTemp != null ? item.minTemp.toFixed(1) + '°C to ' + item.maxTemp.toFixed(1) + '°C' : 'N/A'}`]
         ];
 
         const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
@@ -260,92 +260,32 @@ function initReportCharts() {
 function initComplianceTrendChart() {
     const canvas = document.getElementById("complianceTrendChart");
     if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    const labels = ["Day 1", "Day 3", "Day 6", "Day 9", "Day 12", "Day 15", "Day 18", "Day 21", "Day 24", "Day 27", "Today"];
-    const complianceRateData = [98.2, 98.7, 99.1, 98.4, 97.6, 98.8, 99.4, 98.0, 97.8, 98.5, 98.4];
-    const excursionsData = [1, 0, 0, 1, 2, 0, 0, 1, 2, 0, 1];
-
-    complianceTrendChart = new Chart(ctx, {
+    complianceTrendChart = new Chart(canvas, {
         type: "bar",
         data: {
-            labels,
+            labels: facilityAuditList.map(row => row.name),
             datasets: [
-                {
-                    type: "line",
-                    label: "GDP Compliance Rate (%)",
-                    data: complianceRateData,
-                    borderColor: "#10b981",
-                    backgroundColor: "rgba(16, 185, 129, 0.08)",
-                    borderWidth: 2.5,
-                    fill: false,
-                    tension: 0.3,
-                    yAxisID: "yRate"
-                },
-                {
-                    type: "bar",
-                    label: "Excursions Count",
-                    data: excursionsData,
-                    backgroundColor: "rgba(239, 68, 68, 0.7)",
-                    borderRadius: 4,
-                    barThickness: 12,
-                    yAxisID: "yCount"
-                }
+                { type: "bar", label: "Measured excursions", data: facilityAuditList.map(row => Number(row.excursions || 0)), backgroundColor: "rgba(239,68,68,0.65)" },
+                { type: "line", label: "Measured compliance (%)", data: facilityAuditList.map(row => row.compliance), borderColor: "#10b981", spanGaps: false }
             ]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: "top",
-                    labels: { boxWidth: 12, font: { family: "'Inter', sans-serif", size: 11 } }
-                }
-            },
-            scales: {
-                yRate: {
-                    type: "linear",
-                    position: "left",
-                    min: 94,
-                    max: 100,
-                    ticks: { callback: (v) => `${v}%` },
-                    grid: { color: "#f1f5f9" }
-                },
-                yCount: {
-                    type: "linear",
-                    position: "right",
-                    min: 0,
-                    max: 5,
-                    ticks: { stepSize: 1 },
-                    grid: { display: false }
-                },
-                x: { grid: { display: false } }
-            }
-        }
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
     });
 }
 
 function initRootCauseChart() {
     const canvas = document.getElementById("rootCausePieChart");
     if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    rootCausePieChart = new Chart(ctx, {
-        type: "doughnut",
-        data: {
-            labels: ["Loading Door Ajar", "Defrost Cycle", "Grid Power Outage", "Other Atmospheric"],
-            datasets: [{
-                data: [48, 26, 16, 10],
-                backgroundColor: ["#f59e0b", "#ef4444", "#3b82f6", "#94a3b8"],
-                borderWidth: 2,
-                borderColor: "#ffffff"
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: "65%",
-            plugins: { legend: { display: false } }
-        }
-    });
+    api.get("/alerts").then(response => {
+        const counts = {};
+        (Array.isArray(response.data) ? response.data : []).forEach(alert => {
+            const label = alert.alert_type || "Unclassified";
+            counts[label] = (counts[label] || 0) + 1;
+        });
+        rootCausePieChart = new Chart(canvas, {
+            type: "doughnut",
+            data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ["#f59e0b", "#ef4444", "#3b82f6", "#94a3b8"], borderWidth: 2, borderColor: "#ffffff" }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: "65%", plugins: { legend: { display: true } } }
+        });
+    }).catch(error => console.error("Could not load alert categories:", error));
 }

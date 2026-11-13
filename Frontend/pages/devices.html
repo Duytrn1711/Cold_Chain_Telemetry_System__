@@ -269,13 +269,12 @@
                     <div class="alert-banner-left">
                         <div class="alert-banner-icon">⚠️</div>
                         <div class="alert-banner-text">
-                            <h4>Thermal Excursion Triggered <span class="badge badge-critical" style="font-size:11px;">Active Alert</span></h4>
-                            <p>Sensor node <strong>DEV-004</strong> reported <strong style="color:#b91c1c;">10.8°C</strong> (Threshold +8.0°C) on vehicle 29A-12345 in transit.</p>
+                            <h4>Temperature alerts <span class="badge badge-neutral" style="font-size:11px;">Database status</span></h4>
+                            <p>Temperature excursions are shown here when persisted telemetry exceeds the configured range.</p>
                         </div>
                     </div>
                     <div class="alert-banner-actions">
-                        <button type="button" class="btn btn-secondary" onclick="showToast('Alarm snoozed for 15 minutes', 'info')">Silence 15m</button>
-                        <button type="button" class="btn btn-danger" onclick="scrollToDeviceDetail()">Review Telemetry</button>
+                        <button type="button" class="btn btn-secondary" onclick="window.location.href='alerts.html'">Review alerts</button>
                     </div>
                 </div>
 
@@ -303,19 +302,19 @@
                 <div class="stat-cards-grid" style="grid-template-columns: repeat(4, 1fr);">
                     <div class="stat-card">
                         <div class="stat-card-title">TOTAL HARDWARE</div>
-                        <div class="stat-card-value">14 <span style="font-size:13px; font-weight:500; color:#64748b;">Probes Deployed</span></div>
+                        <div class="stat-card-value" id="device-total-count">—</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-title">ONLINE &amp; HEALTHY</div>
-                        <div class="stat-card-value">13 <span style="font-size:13px; font-weight:600; color:#10b981;">● 92.8% Streaming</span></div>
+                        <div class="stat-card-value" id="device-active-count">—</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-title">THERMAL VIOLATIONS</div>
-                        <div class="stat-card-value" style="color:#ef4444;">1 <span style="font-size:13px; font-weight:600;">10.8°C Excursion</span></div>
+                        <div class="stat-card-value" id="device-excursion-count">—</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-title">AVG BATTERY RESERVE</div>
-                        <div class="stat-card-value">96.4% <span style="font-size:13px; font-weight:500; color:#64748b;">Mains + LiFePO4</span></div>
+                        <div class="stat-card-value" style="color:#64748b;">Not recorded</div>
                     </div>
                 </div>
 
@@ -345,10 +344,10 @@
                     <div class="table-card-header">
                         <div class="table-card-title">
                             <span>Registered Telemetry Units</span>
-                            <span class="count-tag">(Showing 5 of 14)</span>
+                            <span class="count-tag" id="device-count-tag">(Loading database records)</span>
                         </div>
                         <div class="table-card-actions">
-                            <span style="color:#2563eb;">● Polling rate: 10s</span>
+                            <span style="color:#64748b;">Live readings require a connected sensor</span>
                         </div>
                     </div>
 
@@ -374,7 +373,7 @@
                     </div>
 
                     <div class="table-pagination">
-                        <span>Showing 5 of 14 telemetry nodes</span>
+                        <span id="device-pagination-info">No device records loaded</span>
                         <div class="pagination-controls">
                             <button type="button" class="pagination-btn">Previous</button>
                             <button type="button" class="pagination-btn active">1</button>
@@ -391,11 +390,11 @@
                     <div style="display:flex; align-items:center; gap:12px;">
                         <span style="font-size:24px;">🛡️</span>
                         <div>
-                            <div style="font-size:13px; font-weight:700; color:#1e40af;">ISO 9001 / GDP Certified Telemetry Cycle</div>
-                            <div style="font-size:12px; color:#3b82f6;">All 14 active probes recalibrated within required 180-day audit standard. Next routine lab calibration due: Nov 28, 2025.</div>
+                            <div style="font-size:13px; font-weight:700; color:#1e40af;">Sensor calibration records</div>
+                            <div style="font-size:12px; color:#3b82f6;">Calibration dates are not stored in the current database schema.</div>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-secondary" onclick="generateAuditCertificate()">Download Compliance PDF</button>
+                    <button type="button" class="btn btn-secondary" disabled title="Calibration records are not available">Download Compliance PDF</button>
                 </div>
             </main>
         </div>
@@ -416,23 +415,11 @@
                     </div>
                     <div class="form-field">
                         <label for="reg-wh-id">Assign to Cold Warehouse (Optional)</label>
-                        <select id="reg-wh-id">
-                            <option value="">-- No warehouse assignment --</option>
-                            <option value="1">Hanoi Central Cold Storage</option>
-                            <option value="2">Hai Phong Port Cold Facility</option>
-                            <option value="3">Da Nang Distribution Hub</option>
-                            <option value="4">Ho Chi Minh City Logistics Hub</option>
-                            <option value="5">Can Tho Mekong Cold Terminal</option>
-                        </select>
+                        <select id="reg-wh-id"><option value="">Loading database locations…</option></select>
                     </div>
                     <div class="form-field">
                         <label for="reg-veh-id">Or Assign to Reefer Vehicle (Optional)</label>
-                        <select id="reg-veh-id">
-                            <option value="">-- No vehicle assignment --</option>
-                            <option value="1">29A-12345</option>
-                            <option value="2">29A-67890</option>
-                            <option value="3">15A-12345</option>
-                        </select>
+                        <select id="reg-veh-id"><option value="">Loading database vehicles…</option></select>
                     </div>
                     <div class="form-field">
                         <label for="reg-status">Status</label>
@@ -466,30 +453,11 @@
                     </div>
                     <div class="form-field">
                         <label for="edit-dev-wh">Assign to Cold Warehouse (Optional)</label>
-                        <select id="edit-dev-wh">
-                            <option value="">-- No warehouse assignment --</option>
-                            <option value="1">Hanoi Central Cold Storage</option>
-                            <option value="2">Hai Phong Port Cold Facility</option>
-                            <option value="3">Da Nang Distribution Hub</option>
-                            <option value="4">Ho Chi Minh City Logistics Hub</option>
-                            <option value="5">Can Tho Mekong Cold Terminal</option>
-                        </select>
+                        <select id="edit-dev-wh"><option value="">Loading database locations…</option></select>
                     </div>
                     <div class="form-field">
                         <label for="edit-dev-veh">Or Assign to Reefer Vehicle (Optional)</label>
-                        <select id="edit-dev-veh">
-                            <option value="">-- No vehicle assignment --</option>
-                            <option value="1">29A-12345</option>
-                            <option value="2">29A-67890</option>
-                            <option value="3">15A-12345</option>
-                            <option value="4">15A-67890</option>
-                            <option value="5">43A-12345</option>
-                            <option value="6">43A-67890</option>
-                            <option value="7">51A-12345</option>
-                            <option value="8">51A-67890</option>
-                            <option value="9">65A-12345</option>
-                            <option value="10">65A-67890</option>
-                        </select>
+                        <select id="edit-dev-veh"><option value="">Loading database vehicles…</option></select>
                     </div>
                     <div class="form-field">
                         <label for="edit-dev-status">Device Status</label>

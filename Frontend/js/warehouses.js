@@ -13,19 +13,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     initFilters();
     initModal();
 
-    // Listen to live telemetry updates
+    // Refresh from persisted telemetry after an API-confirmed reading.
     window.onTelemetryLiveUpdate = (packet) => {
-        if (packet.device && packet.device.warehouse_name) {
-            console.log("Telemetry received for warehouse:", packet);
-            // If belongs to currently selected warehouse, update chamber reading
-            const wh = allWarehouses.find(w => w.id == selectedWarehouseId);
-            if (wh && wh.warehouse_name === packet.device.warehouse_name) {
-                const tempEl = document.getElementById("chamber-a-temp");
-                if (tempEl) {
-                    tempEl.textContent = `${parseFloat(packet.temperature).toFixed(1)}°C`;
-                }
-                updateWarehouseChartLivePoint(parseFloat(packet.temperature));
-            }
+        if (packet?.persisted) {
+            const selected = allWarehouses.find((item) => String(item.id) === String(selectedWarehouseId));
+            if (selected) renderWarehouseTempChart(selected);
         }
     };
 });
@@ -71,12 +63,12 @@ function renderWarehousesTable(list) {
     tbody.innerHTML = list.map((wh) => {
         const isSelected = wh.id == selectedWarehouseId;
         const code = `WH-0${wh.id}`;
-        const devCount = wh.device_count || (wh.id == 1 ? 6 : wh.id == 2 ? 4 : 3);
-        const vehCount = wh.vehicle_count || (wh.id == 1 ? 4 : wh.id == 2 ? 2 : 2);
-        const avgTemp = wh.avg_temp ? `${parseFloat(wh.avg_temp).toFixed(1)}°C` : "3.8°C";
-        const coords = (wh.latitude && wh.longitude) 
-            ? `${parseFloat(wh.latitude).toFixed(4)}° N, ${parseFloat(wh.longitude).toFixed(4)}° E`
-            : "21.0285° N, 105.8542° E";
+        const devCount = Number(wh.device_count || 0);
+        const vehCount = Number(wh.vehicle_count || 0);
+        const avgTemp = wh.avg_temp === null || wh.avg_temp === undefined ? "—" : `${parseFloat(wh.avg_temp).toFixed(1)}°C`;
+        const coords = (wh.latitude !== null && wh.longitude !== null)
+            ? `${parseFloat(wh.latitude).toFixed(4)}, ${parseFloat(wh.longitude).toFixed(4)}`
+            : "Coordinates not recorded";
 
         return `
             <tr class="${isSelected ? 'row-selected' : ''}" onclick="selectWarehouse(${wh.id})" style="cursor:pointer; transition:all 0.15s ease;">
@@ -85,7 +77,7 @@ function renderWarehousesTable(list) {
                     <div class="cell-bold" style="font-size:14px; margin-top:2px;">${wh.warehouse_name}</div>
                 </td>
                 <td>
-                    <div style="font-size:12px; color:#475569;">${wh.warehouse_name} Compound</div>
+                    <div style="font-size:12px; color:#475569;">${wh.warehouse_name}</div>
                     <div class="cell-subtext" style="font-family:'JetBrains Mono',monospace;">${coords}</div>
                 </td>
                 <td>
@@ -96,7 +88,7 @@ function renderWarehousesTable(list) {
                 </td>
                 <td>
                     <div style="font-weight:600; font-size:12px; color:#334155;">${devCount} Sensors · ${vehCount} Fleet</div>
-                    <div class="cell-subtext" style="color:#10b981;">Telemetry Active</div>
+                    <div class="cell-subtext" style="color:#64748b;">${devCount ? "Registered devices" : "No devices assigned"}</div>
                 </td>
                 <td>
                     <span class="temp-display temp-safe" style="font-family:'JetBrains Mono',monospace;">${avgTemp}</span>
@@ -143,25 +135,25 @@ function selectWarehouse(id) {
     if (nameEl) nameEl.textContent = wh.warehouse_name;
 
     const subEl = document.getElementById("panel-wh-sub");
-    if (subEl) subEl.textContent = `${wh.warehouse_name}, Logistics Cold Hub`;
+    if (subEl) subEl.textContent = wh.status || "Status unavailable";
 
     const coordsEl = document.getElementById("panel-wh-coords");
     if (coordsEl) {
-        coordsEl.textContent = (wh.latitude && wh.longitude)
-            ? `${parseFloat(wh.latitude).toFixed(4)}° N, ${parseFloat(wh.longitude).toFixed(4)}° E`
-            : "21.0285° N, 105.8542° E";
+        coordsEl.textContent = wh.latitude !== null && wh.longitude !== null
+            ? `${parseFloat(wh.latitude).toFixed(5)}, ${parseFloat(wh.longitude).toFixed(5)}`
+            : "Coordinates not recorded";
     }
 
     const createdEl = document.getElementById("panel-wh-created");
     if (createdEl) {
-        createdEl.textContent = wh.created_at ? new Date(wh.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Jan 12, 2025";
+        createdEl.textContent = wh.created_at ? new Date(wh.created_at).toLocaleDateString("vi-VN") : "—";
     }
 
     const vehEl = document.getElementById("panel-wh-vehicles");
-    if (vehEl) vehEl.textContent = wh.vehicle_count || (wh.id === 1 ? 4 : 2);
+    if (vehEl) vehEl.textContent = wh.vehicle_count ?? 0;
 
     const sensorEl = document.getElementById("panel-wh-sensors");
-    if (sensorEl) sensorEl.textContent = wh.device_count || (wh.id === 1 ? 6 : 4);
+    if (sensorEl) sensorEl.textContent = wh.device_count ?? 0;
 
     const mapPin = document.getElementById("map-pin-label");
     if (mapPin) mapPin.textContent = `${wh.warehouse_name} • WH-0${wh.id}`;
@@ -176,140 +168,37 @@ function selectWarehouse(id) {
 /**
  * Render real-time chamber thermal curve for the selected facility (matching vehicles chart)
  */
-function renderWarehouseTempChart(wh) {
-    const ctx = document.getElementById("warehouseTempChart");
-    if (!ctx) return;
-
-    if (warehouseChart) {
-        warehouseChart.destroy();
-    }
-
-    const labels = ["00:00", "02:00", "04:00", "06:00", "08:00", "10:00", "10:45"];
-
-    // Base temperature tailored by facility ID for variety
-    const baseA = 3.2 + ((wh.id * 0.3) % 1.5);
-    const baseB = 4.1 + ((wh.id * 0.2) % 1.2);
-
-    const chamberAData = [
-        (baseA).toFixed(1),
-        (baseA + 0.2).toFixed(1),
-        (baseA - 0.1).toFixed(1),
-        (baseA + 0.3).toFixed(1),
-        (baseA + 0.5).toFixed(1),
-        (baseA + 0.2).toFixed(1),
-        (baseA + 0.4).toFixed(1)
-    ];
-
-    const chamberBData = [
-        (baseB).toFixed(1),
-        (baseB - 0.2).toFixed(1),
-        (baseB + 0.1).toFixed(1),
-        (baseB).toFixed(1),
-        (baseB + 0.4).toFixed(1),
-        (baseB + 0.2).toFixed(1),
-        (baseB + 0.3).toFixed(1)
-    ];
-
-    const upperSafe = [8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0];
-    const lowerSafe = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0];
-
-    warehouseChart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: "Chamber A (Vaccine & Pharma)",
-                    data: chamberAData,
-                    borderColor: "#2563eb",
-                    backgroundColor: "rgba(37, 99, 235, 0.06)",
-                    borderWidth: 2.5,
-                    tension: 0.3,
-                    fill: false,
-                    pointBackgroundColor: "#2563eb",
-                    pointRadius: 3
-                },
-                {
-                    label: "Chamber B (Cold Storage)",
-                    data: chamberBData,
-                    borderColor: "#10b981",
-                    backgroundColor: "rgba(16, 185, 129, 0.05)",
-                    borderWidth: 2,
-                    tension: 0.3,
-                    fill: false,
-                    pointBackgroundColor: "#10b981",
-                    pointRadius: 3
-                },
-                {
-                    label: "Safe Upper Bound (8.0°C)",
-                    data: upperSafe,
-                    borderColor: "#ef4444",
-                    borderWidth: 1.5,
-                    borderDash: [5, 4],
-                    pointRadius: 0,
-                    fill: false
-                },
-                {
-                    label: "Safe Lower Bound (2.0°C)",
-                    data: lowerSafe,
-                    borderColor: "#38bdf8",
-                    borderWidth: 1.5,
-                    borderDash: [5, 4],
-                    pointRadius: 0,
-                    fill: false
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (c) => `${c.dataset.label}: ${c.parsed.y}°C`
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { color: "#64748b", font: { size: 10 } }
-                },
-                y: {
-                    min: 0,
-                    max: 10,
-                    ticks: {
-                        stepSize: 2,
-                        color: "#64748b",
-                        callback: (v) => `${v}°C`
-                    },
-                    grid: {
-                        color: (c) => (c.tick.value === 2 || c.tick.value === 8 ? "rgba(37,99,235,0.25)" : "rgba(226,232,240,0.6)")
-                    }
-                }
-            }
-        }
-    });
-
-    // Update chamber tiles
-    const chATemp = document.getElementById("chamber-a-temp");
-    if (chATemp) chATemp.textContent = `${chamberAData[chamberAData.length - 1]}°C`;
-
-    const chBTemp = document.getElementById("chamber-b-temp");
-    if (chBTemp) chBTemp.textContent = `${chamberBData[chamberBData.length - 1]}°C`;
-}
-
-function updateWarehouseChartLivePoint(temp) {
-    if (!warehouseChart) return;
-    const ds = warehouseChart.data.datasets[0];
-    if (ds && ds.data) {
-        ds.data.shift();
-        ds.data.push(temp.toFixed(1));
-        warehouseChart.update();
+async function renderWarehouseTempChart(warehouse) {
+    const canvas = document.getElementById("warehouseTempChart");
+    if (!canvas || typeof Chart === "undefined") return;
+    if (warehouseChart) warehouseChart.destroy();
+    try {
+        const response = await api.get(`/warehouses/${warehouse.id}`);
+        const readings = response.success ? response.data.telemetryHistory || [] : [];
+        const labels = readings.map((item) => new Date(item.created_at).toLocaleString());
+        const entities = [...new Set(readings.map((item) => item.device_token))];
+        const colors = ["#2563eb", "#10b981", "#8b5cf6", "#f59e0b"];
+        const legend = document.getElementById("warehouse-chart-legend");
+        if (legend) legend.innerHTML = entities.map((token, index) => `<span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:${colors[index % colors.length]};"></span>${token}</span>`).join("");
+        const datasets = entities.map((token, index) => ({
+            label: token,
+            data: readings.map((item) => item.device_token === token ? Number(item.temperature) : null),
+            borderColor: colors[index % colors.length],
+            backgroundColor: "transparent",
+            tension: 0.25,
+            spanGaps: false
+        }));
+        const subtitle = document.getElementById("wh-chart-subtitle");
+        if (subtitle) subtitle.textContent = readings.length ? `${readings.length} readings stored for this warehouse` : "No telemetry readings are stored for this warehouse.";
+        warehouseChart = new Chart(canvas, {
+            type: "line",
+            data: { labels, datasets },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: entities.length > 1 } }, scales: { y: { suggestedMin: 0, suggestedMax: 12, ticks: { callback: (value) => `${value}°C` } } } }
+        });
+    } catch (error) {
+        console.error("Could not load warehouse telemetry:", error);
     }
 }
-
 function initFilters() {
     const searchInput = document.getElementById("wh-search-input");
     const statusSelect = document.getElementById("wh-status-filter");
@@ -473,7 +362,7 @@ window.triggerGpsForSelectedWh = function() {
 
     const coords = (wh.latitude && wh.longitude)
         ? `${parseFloat(wh.latitude).toFixed(4)}° N, ${parseFloat(wh.longitude).toFixed(4)}° E`
-        : "21.0285° N, 105.8542° E";
+        : "Coordinates not recorded";
 
     if (typeof window.showGpsRadarModal === "function") {
         window.showGpsRadarModal(wh.warehouse_name, coords);
@@ -489,11 +378,11 @@ function exportWarehouseList() {
     const rows = allWarehouses.map(w => [
         `"WH-0${w.id}"`,
         `"${w.warehouse_name}"`,
-        `"${w.latitude || '21.0285'}"`,
-        `"${w.longitude || '105.8542'}"`,
+        `"${w.latitude ?? ""}"`,
+        `"${w.longitude ?? ""}"`,
         `"${w.status}"`,
-        `"${w.device_count || 4}"`,
-        `"${w.vehicle_count || 2}"`
+        `"${w.device_count ?? 0}"`,
+        `"${w.vehicle_count ?? 0}"`
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");

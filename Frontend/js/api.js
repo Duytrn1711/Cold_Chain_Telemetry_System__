@@ -3,9 +3,9 @@
  * Centralized fetch wrapper with JWT authentication header handling and error routing
  */
 
-const API_BASE_URL = window.location.port === "3000" 
-    ? "/api" 
-    : "http://localhost:3000/api";
+// The API and frontend are served by the same Express app in development and
+// production, so use the current origin instead of a machine-specific URL.
+const API_BASE_URL = "/api";
 
 const api = {
     getToken() {
