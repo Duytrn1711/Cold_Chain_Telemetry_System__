@@ -4,3 +4,4 @@
 !.env.*.example
 .neon/auth.json
 node_modules/
+/.database-backups/
