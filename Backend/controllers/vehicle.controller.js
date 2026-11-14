@@ -32,10 +32,12 @@ exports.getAllVehicles = async (req, res) => {
                 ORDER BY device_id, created_at DESC
             ) dt ON dt.device_id = d.id
             LEFT JOIN LATERAL (
-                SELECT external_batch_code, logistics_status, inspection_decision, pickup_address, consumption_address
-                FROM agri_batches
-                WHERE vehicle_id = v.id AND logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
-                ORDER BY updated_at DESC LIMIT 1
+                SELECT o.external_batch_code, o.logistics_status, o.inspection_decision,
+                    b.origin AS pickup_address, o.consumption_address
+                FROM cold_chain_batch_operations o
+                JOIN agri_batches b ON b.id = o.batch_id
+                WHERE o.vehicle_id = v.id AND o.logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
+                ORDER BY o.updated_at DESC LIMIT 1
             ) shipment ON TRUE
             WHERE 1=1
         `;
@@ -104,13 +106,14 @@ exports.getVehicleById = async (req, res) => {
         const vehicle = vehicleRes.rows[0];
 
         const shipmentRes = await pool.query(`
-            SELECT id, external_batch_code, product_name, producer_name, inspection_decision,
-                logistics_status, pickup_address,
-                CASE WHEN inspection_decision = 'REJECTED' THEN pickup_address ELSE consumption_address END AS destination_address,
-                quantity, unit, updated_at
-            FROM agri_batches
-            WHERE vehicle_id = $1 AND logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
-            ORDER BY updated_at DESC LIMIT 1
+            SELECT b.id, o.external_batch_code, b.product_name, b.producer_name, o.inspection_decision,
+                o.logistics_status, b.origin AS pickup_address,
+                CASE WHEN o.inspection_decision = 'REJECTED' THEN b.origin ELSE o.consumption_address END AS destination_address,
+                b.quantity, b.unit, o.updated_at
+            FROM cold_chain_batch_operations o
+            JOIN agri_batches b ON b.id = o.batch_id
+            WHERE o.vehicle_id = $1 AND o.logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
+            ORDER BY o.updated_at DESC LIMIT 1
         `, [id]);
 
         // Lấy tất cả thiết bị gán trên xe

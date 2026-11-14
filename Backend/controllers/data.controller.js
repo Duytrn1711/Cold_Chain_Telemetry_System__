@@ -8,7 +8,7 @@ exports.getSummary = async (req, res) => {
             pool.query("SELECT COUNT(*) AS total, COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active FROM warehouse"),
             pool.query(`SELECT COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE status = 'ACTIVE') AS active,
-                (SELECT COUNT(DISTINCT vehicle_id) FROM agri_batches
+                (SELECT COUNT(DISTINCT vehicle_id) FROM cold_chain_batch_operations
                     WHERE vehicle_id IS NOT NULL AND logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')) AS in_transit
                 FROM delivery_vehicle`),
             pool.query("SELECT COUNT(*) AS total, COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active FROM device"),
@@ -16,7 +16,7 @@ exports.getSummary = async (req, res) => {
                 COUNT(*) FILTER (WHERE UPPER(alert_type) LIKE '%HIGH%' OR UPPER(alert_type) LIKE '%CAO%' OR UPPER(alert_type) LIKE '%LOW%' OR UPPER(alert_type) LIKE '%THẤP%') AS critical,
                 COUNT(*) FILTER (WHERE UPPER(alert_type) NOT LIKE '%HIGH%' AND UPPER(alert_type) NOT LIKE '%CAO%' AND UPPER(alert_type) NOT LIKE '%LOW%' AND UPPER(alert_type) NOT LIKE '%THẤP%') AS warning
                 FROM alert`),
-            pool.query(`SELECT logistics_status, COUNT(*) AS count FROM agri_batches GROUP BY logistics_status`)
+            pool.query(`SELECT logistics_status, COUNT(*) AS count FROM cold_chain_batch_operations GROUP BY logistics_status`)
         ]);
 
         // Tính tỷ lệ tuân thủ nhiệt độ chuẩn (2.0°C - 8.0°C)

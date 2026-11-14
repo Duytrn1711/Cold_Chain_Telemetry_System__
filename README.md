@@ -53,29 +53,26 @@ Content-Type: application/json
 
 `POST /pickup-requests`
 
+Agri-Audit gửi các trường nông dân đã nhập cùng `event_id` và `batch_code` do hệ thống tự sinh:
+
 ```json
 {
   "event_id": "evt-unique-001",
   "batch_code": "AGR-2026-0001",
   "product_name": "Tomato",
   "product_type": "Fresh produce",
-  "producer_name": "Nguyen Van A",
-  "producer_phone": "+84901234567",
-  "pickup_address": "Farm address, commune, district, province",
-  "pickup_latitude": 10.1234567,
-  "pickup_longitude": 106.1234567,
-  "consumption_point_name": "Distribution market",
-  "consumption_address": "Market address, district, province",
-  "consumption_latitude": 10.2345678,
-  "consumption_longitude": 106.2345678,
+  "origin": "Farm address, commune, district, province",
   "quantity": 250,
   "unit": "kg",
   "production_date": "2026-11-12",
-  "expiry_date": "2026-11-20"
+  "expiry_date": "2026-11-20",
+  "note": "Harvested this morning",
+  "producer_name": "Nguyen Van A",
+  "farmer_id": 2042
 }
 ```
 
-Bắt buộc: `event_id`, `batch_code`, `product_name`, `producer_name`, `pickup_address`, `quantity` dương và `unit`. Tọa độ, liên hệ, loại sản phẩm và ngày là tùy chọn. Gửi lại cùng event/lô trả bản ghi hiện tại mà không tạo event mới.
+Bắt buộc từ form nông dân: `product_name` và `product_type` dài 2–200 ký tự, `origin` dài 2–200 ký tự, `quantity` lớn hơn 0 và `unit` dài 1–50 ký tự. `production_date`, `expiry_date`, `note`, `producer_name` và `farmer_id` là tùy chọn. `event_id` và `batch_code` là metadata do Agri-Audit tự sinh; chúng cùng trạng thái kiểm định/điều phối được lưu trong `cold_chain_batch_operations`. Bảng `agri_batches` chỉ lưu dữ liệu lô trong ảnh và khóa kỹ thuật `id`. `origin` được dùng làm địa chỉ lấy hàng và hoàn trả nông dân. `producer_name` có thể null; `farmer_id` là mã tham chiếu từ Agri-Audit, không có khóa ngoại cục bộ. Gửi lại cùng event/lô trả bản ghi hiện tại mà không tạo event mới.
 
 ### Gửi quyết định kiểm định
 
