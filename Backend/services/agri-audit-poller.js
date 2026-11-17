@@ -1,9 +1,11 @@
 const crypto = require("crypto");
 const pool = require("../db");
 
-const DEFAULT_INTERVAL_MS = 60_000;
+const DEFAULT_INTERVAL_MS = 5_000;
 let timer;
 let running = false;
+let cachedAccessToken = null;
+let cachedTokenExpiresAt = 0;
 
 function stableEventId(kind, batchCode, status = "") {
     const digest = crypto.createHash("sha256").update(`${batchCode}:${status}`).digest("hex").slice(0, 40);
@@ -28,17 +30,34 @@ async function requestJson(url, options = {}) {
 }
 
 async function getAgriBatches(config) {
-    const login = await requestJson(`${config.baseUrl}/auth/login-admin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: config.identifier, password: config.password })
-    });
-    if (!login || typeof login.access_token !== "string" || !login.access_token) {
-        throw new Error("Agri-Audit admin login response did not include an access token");
+    async function login() {
+        const result = await requestJson(`${config.baseUrl}/auth/login-admin`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ identifier: config.identifier, password: config.password })
+        });
+        if (!result || typeof result.access_token !== "string" || !result.access_token) {
+            throw new Error("Agri-Audit admin login response did not include an access token");
+        }
+        cachedAccessToken = result.access_token;
+        cachedTokenExpiresAt = Date.now() + 50 * 60 * 1000;
     }
-    const batches = await requestJson(`${config.baseUrl}/batches`, {
-        headers: { Authorization: `Bearer ${login.access_token}` }
-    });
+
+    if (!cachedAccessToken || Date.now() >= cachedTokenExpiresAt) await login();
+    let batches;
+    try {
+        batches = await requestJson(`${config.baseUrl}/batches`, {
+            headers: { Authorization: `Bearer ${cachedAccessToken}` }
+        });
+    } catch (error) {
+        if (error.status !== 401) throw error;
+        cachedAccessToken = null;
+        cachedTokenExpiresAt = 0;
+        await login();
+        batches = await requestJson(`${config.baseUrl}/batches`, {
+            headers: { Authorization: `Bearer ${cachedAccessToken}` }
+        });
+    }
     if (!Array.isArray(batches)) throw new Error("Agri-Audit batch list response was not an array");
     return batches;
 }

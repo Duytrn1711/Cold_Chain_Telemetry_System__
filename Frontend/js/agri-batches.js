@@ -24,6 +24,9 @@ const nextLogisticsStatus = {
 };
 let agriBatches = [];
 let assignedAssets = { vehicles: [], warehouses: [] };
+let knownBatchCodes = null;
+let refreshInProgress = false;
+let noticeTimeout;
 
 const safe = (value) => String(value ?? "—").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 
@@ -33,16 +36,42 @@ async function loadAssignedAssets() {
     assignedAssets.warehouses = warehouses.success && Array.isArray(warehouses.data) ? warehouses.data : [];
 }
 
-async function loadAgriBatches() {
+function showNewBatchNotice(batches) {
+    const notice = document.getElementById("batch-live-notice");
+    if (!notice || !batches.length) return;
+    const first = batches[0];
+    const label = batches.length === 1
+        ? `${first.external_batch_code} · ${first.product_name}`
+        : `${batches.length} lô hàng mới`;
+    notice.textContent = `Agri-Audit vừa gửi lô hàng: ${label}`;
+    notice.hidden = false;
+    clearTimeout(noticeTimeout);
+    noticeTimeout = setTimeout(() => { notice.hidden = true; }, 10000);
+    if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Cold Chain nhận lô hàng mới", { body: label });
+    }
+}
+
+async function loadAgriBatches({ quiet = false } = {}) {
+    if (refreshInProgress) return;
+    refreshInProgress = true;
     const body = document.getElementById("batch-table-body");
-    body.innerHTML = '<tr><td class="batch-message" colspan="8">Đang tải dữ liệu từ PostgreSQL...</td></tr>';
+    if (!quiet) body.innerHTML = '<tr><td class="batch-message" colspan="8">Đang tải dữ liệu từ PostgreSQL...</td></tr>';
     try {
         const res = await api.get("/agri-batches");
         if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || "Không thể tải danh sách lô hàng");
+        const nextCodes = new Set(res.data.map((batch) => batch.external_batch_code).filter(Boolean));
+        if (knownBatchCodes) {
+            const incoming = res.data.filter((batch) => batch.external_batch_code && !knownBatchCodes.has(batch.external_batch_code));
+            showNewBatchNotice(incoming);
+        }
+        knownBatchCodes = nextCodes;
         agriBatches = res.data;
         renderAgriBatches();
     } catch (error) {
-        body.innerHTML = `<tr><td class="batch-message" colspan="8">${safe(error.message || "Không thể kết nối API")}</td></tr>`;
+        if (!quiet) body.innerHTML = `<tr><td class="batch-message" colspan="8">${safe(error.message || "Không thể kết nối API")}</td></tr>`;
+    } finally {
+        refreshInProgress = false;
     }
 }
 
@@ -118,6 +147,7 @@ async function updateAgriBatchStatus(batchId, nextStatus) {
 document.addEventListener("DOMContentLoaded", async () => {
     try { await loadAssignedAssets(); } catch (error) { console.warn("Asset lists could not be loaded:", error); }
     await loadAgriBatches();
+    window.setInterval(() => loadAgriBatches({ quiet: true }), 5000);
     document.getElementById("batch-status-filter").addEventListener("change", renderAgriBatches);
     document.getElementById("batch-search").addEventListener("input", renderAgriBatches);
     document.getElementById("batch-refresh").addEventListener("click", loadAgriBatches);

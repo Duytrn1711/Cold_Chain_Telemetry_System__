@@ -29,6 +29,8 @@
         .batch-counts { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
         .batch-count { border:1px solid #e2e8f0; background:#fff; border-radius:10px; padding:12px 16px; color:#475569; }
         .batch-count strong { display:block; font-size:20px; color:#0f172a; margin-top:4px; }
+        .batch-live-notice { position:fixed; right:24px; top:82px; z-index:1000; max-width:min(420px,calc(100vw - 32px)); padding:14px 18px; border-radius:10px; background:#ecfdf5; border:1px solid #6ee7b7; color:#065f46; box-shadow:0 10px 30px #0f172a22; }
+        .batch-live-notice[hidden] { display:none; }
         @media(max-width:700px){.batch-page{padding:18px}.batch-header{display:block}.batch-toolbar{align-items:stretch;flex-direction:column}}
     </style>
 </head>
@@ -44,6 +46,7 @@
                 <header class="batch-header">
                     <div><h1>Lô nông sản từ Agri Audit</h1><p>Theo dõi lấy hàng, chuyển đến kiểm định và giao hoặc hoàn trả theo kết quả.</p></div>
                 </header>
+                <div id="batch-live-notice" class="batch-live-notice" role="status" aria-live="polite" hidden></div>
                 <section class="batch-counts" id="batch-counts" aria-live="polite"></section>
                 <section class="batch-toolbar">
                     <select id="batch-status-filter" aria-label="Lọc trạng thái"><option value="ALL">Tất cả trạng thái</option></select>
