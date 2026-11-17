@@ -2,7 +2,9 @@
 
 Cold Chain là dịch vụ tiếp nhận yêu cầu lấy lô hàng từ Agri-Audit, quản lý vận chuyển đến điểm kiểm định, rồi giao đến điểm tiêu thụ nếu lô được duyệt hoặc trả về địa chỉ nông dân nếu bị từ chối. Danh mục kho, xe, thiết bị, telemetry, cảnh báo, lô hàng và lịch sử vận hành được lưu trong PostgreSQL.
 
-Cold Chain cung cấp API tích hợp cho Agri-Audit và giao diện vận hành cho nhân viên. Agri-Audit hiện cần cấu hình phía gửi webhook theo hợp đồng ở dưới; repo này chỉ triển khai phía Cold Chain.
+Cold Chain cung cấp API tích hợp cho Agri-Audit và giao diện vận hành cho nhân viên. Có thể chọn webhook push từ Agri-Audit hoặc polling pull do Cold Chain chủ động chạy; chế độ pull không cần thay đổi mã nguồn Agri-Audit.
+
+Ngoài webhook push, Cold Chain hỗ trợ chế độ pull: cấu hình thông tin đăng nhập admin Agri-Audit trong Environment Variables thì Cold Chain tự gọi API `/batches` ngay khi khởi động và mỗi 60 giây. Mỗi `batch_code` chỉ được nhập một lần.
 
 ## Yêu cầu
 
@@ -22,7 +24,7 @@ Set-Location .\Backend
 npm install
 ```
 
-Điền thông tin database, `JWT_SECRET` (tối thiểu 32 ký tự) và `AGRI_WEBHOOK_SECRET` riêng trong `.env`. Đặt thông tin bootstrap admin mạnh trước khi tạo tài khoản:
+Điền thông tin database và `JWT_SECRET` (tối thiểu 32 ký tự) trong `.env`. Chỉ cần `AGRI_WEBHOOK_SECRET` nếu dùng webhook push; chế độ polling pull không cần shared secret này. Đặt thông tin bootstrap admin mạnh trước khi tạo tài khoản:
 
 ```powershell
 npm run bootstrap-admin
@@ -41,6 +43,23 @@ npm start
 Các trạng thái giao/hoàn trả được backend giới hạn theo quyết định kiểm định. Mỗi event webhook có `event_id` duy nhất để chống xử lý lặp; event ID đã dùng cho lô khác sẽ bị từ chối.
 
 ## API tích hợp Agri-Audit
+
+### Đồng bộ chủ động từ Agri-Audit (không cần sửa Agri-Audit)
+
+Cold Chain đăng nhập admin ở `POST /auth/login-admin`, lấy `access_token`, rồi gọi `GET /batches` với `Authorization: Bearer <token>`. Đặt các biến sau trong Render Environment của Cold Chain:
+
+```text
+AGRI_AUDIT_API_URL=https://agri-audit-chain-backend.onrender.com
+AGRI_AUDIT_ADMIN_IDENTIFIER=<email hoặc username admin Agri-Audit>
+AGRI_AUDIT_ADMIN_PASSWORD=<mật khẩu admin Agri-Audit>
+AGRI_AUDIT_POLL_INTERVAL_MS=60000
+```
+
+Polling bắt đầu khi Cold Chain khởi động. Dùng tài khoản admin riêng cho tích hợp nếu có thể; các thông tin đăng nhập chỉ được lưu trên backend Cold Chain, không đưa vào frontend hoặc Git. Nếu API Agri-Audit không truy cập được, Cold Chain ghi lỗi đã khử thông tin nhạy cảm và thử lại ở chu kỳ kế tiếp.
+
+Cold Chain tạo yêu cầu lấy hàng khi phát hiện `batch_code` mới. Khi Agri-Audit đổi trạng thái sang `AUDITED` hoặc `REJECTED`, quyết định được đồng bộ sau khi lô đã ở `AT_INSPECTION`. API danh sách hiện không cung cấp `consumption_address`; vì vậy lô được duyệt sẽ chờ địa chỉ điểm tiêu thụ trước khi xe được phép xuất phát giao hàng. API cần bổ sung trường địa chỉ này để hoàn tất giao tự động theo điểm doanh nghiệp đã chọn.
+
+Polling lấy toàn bộ danh sách `/batches` mỗi chu kỳ vì API hiện chưa có bộ lọc trạng thái hoặc phân trang.
 
 Base URL: `http://<cold-chain-host>:3000/api/integrations/agri/batches`. Hai webhook dùng header dùng chung bí mật:
 

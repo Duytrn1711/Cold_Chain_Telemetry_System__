@@ -193,6 +193,9 @@ async function transitionBatch(req, res) {
         if (nextStatus === "OUT_FOR_DELIVERY" && batch.inspection_decision !== "APPROVED") {
             await client.query("ROLLBACK"); return sendError(res, 409, "Only approved batches can be sent to the consumption point");
         }
+        if (nextStatus === "OUT_FOR_DELIVERY" && !batch.consumption_address) {
+            await client.query("ROLLBACK"); return sendError(res, 409, "Agri-Audit has not provided the consumption address");
+        }
         if (nextStatus === "OUT_FOR_RETURN" && batch.inspection_decision !== "REJECTED") {
             await client.query("ROLLBACK"); return sendError(res, 409, "Only rejected batches can be returned to the producer");
         }
