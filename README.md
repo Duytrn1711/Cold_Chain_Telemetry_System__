@@ -46,16 +46,16 @@ Các trạng thái giao/hoàn trả được backend giới hạn theo quyết �
 
 ### Đồng bộ chủ động từ Agri-Audit (không cần sửa Agri-Audit)
 
-Cold Chain đăng nhập admin ở `POST /auth/login-admin`, lấy `access_token`, rồi gọi `GET /batches` với `Authorization: Bearer <token>`. Đặt các biến sau trong Render Environment của Cold Chain:
+Cold Chain đăng nhập tài khoản Auditor ở `POST /auth/login-auditor`, lấy `access_token`, rồi gọi `GET /batches` với `Authorization: Bearer <token>`. Đặt các biến sau trong Render Environment của Cold Chain:
 
 ```text
 AGRI_AUDIT_API_URL=https://agri-audit-chain-backend.onrender.com
-AGRI_AUDIT_ADMIN_IDENTIFIER=<email hoặc username admin Agri-Audit>
-AGRI_AUDIT_ADMIN_PASSWORD=<mật khẩu admin Agri-Audit>
+AGRI_AUDIT_AUDITOR_IDENTIFIER=<email hoặc username Auditor Agri-Audit>
+AGRI_AUDIT_AUDITOR_PASSWORD=<mật khẩu Auditor Agri-Audit>
 AGRI_AUDIT_POLL_INTERVAL_MS=5000
 ```
 
-Polling bắt đầu khi Cold Chain khởi động. Dùng tài khoản admin riêng cho tích hợp nếu có thể; các thông tin đăng nhập chỉ được lưu trên backend Cold Chain, không đưa vào frontend hoặc Git. Access token được giữ trong bộ nhớ và làm mới trước khi hết hạn; nếu API Agri-Audit không truy cập được, Cold Chain ghi lỗi đã khử thông tin nhạy cảm và thử lại ở chu kỳ kế tiếp.
+Polling bắt đầu khi Cold Chain khởi động. Dùng tài khoản Auditor dành cho tích hợp; các thông tin đăng nhập chỉ được lưu trên backend Cold Chain, không đưa vào frontend hoặc Git. Access token được giữ trong bộ nhớ và làm mới trước khi hết hạn; nếu API Agri-Audit không truy cập được, Cold Chain ghi lỗi đã khử thông tin nhạy cảm và thử lại ở chu kỳ kế tiếp.
 
 Cold Chain tạo yêu cầu lấy hàng khi phát hiện `batch_code` mới. Khi Agri-Audit đổi trạng thái sang `AUDITED` hoặc `REJECTED`, quyết định được đồng bộ sau khi lô đã ở `AT_INSPECTION`. API danh sách hiện không cung cấp `consumption_address`; vì vậy lô được duyệt sẽ chờ địa chỉ điểm tiêu thụ trước khi xe được phép xuất phát giao hàng. API cần bổ sung trường địa chỉ này để hoàn tất giao tự động theo điểm doanh nghiệp đã chọn.
 

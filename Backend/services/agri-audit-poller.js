@@ -31,7 +31,7 @@ async function requestJson(url, options = {}) {
 
 async function getAgriBatches(config) {
     async function login() {
-        const result = await requestJson(`${config.baseUrl}/auth/login-admin`, {
+        const result = await requestJson(`${config.baseUrl}/auth/login-auditor`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ identifier: config.identifier, password: config.password })
@@ -147,8 +147,8 @@ async function syncOneBatch(batch) {
 async function pollOnce() {
     if (running) return;
     const baseUrl = (process.env.AGRI_AUDIT_API_URL || "").trim().replace(/\/+$/, "");
-    const identifier = process.env.AGRI_AUDIT_ADMIN_IDENTIFIER;
-    const password = process.env.AGRI_AUDIT_ADMIN_PASSWORD;
+    const identifier = process.env.AGRI_AUDIT_AUDITOR_IDENTIFIER || process.env.AGRI_AUDIT_ADMIN_IDENTIFIER;
+    const password = process.env.AGRI_AUDIT_AUDITOR_PASSWORD || process.env.AGRI_AUDIT_ADMIN_PASSWORD;
     if (!baseUrl || !identifier || !password) return;
 
     running = true;
