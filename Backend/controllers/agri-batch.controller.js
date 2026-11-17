@@ -233,8 +233,8 @@ async function transitionBatch(req, res) {
         })]);
         await client.query(`UPDATE cold_chain_batch_operations SET logistics_status=$2,
             warehouse_id=COALESCE($3,warehouse_id), vehicle_id=COALESCE($4,vehicle_id),
-            completed_at=CASE WHEN $2 IN ('DELIVERED','RETURNED') THEN CURRENT_TIMESTAMP ELSE completed_at END,
-            updated_at=CURRENT_TIMESTAMP WHERE batch_id=$1`, [batch.id, nextStatus, req.body.warehouse_id ?? null, req.body.vehicle_id ?? null]);
+            completed_at=CASE WHEN $5 IN ('DELIVERED','RETURNED') THEN CURRENT_TIMESTAMP ELSE completed_at END,
+            updated_at=CURRENT_TIMESTAMP WHERE batch_id=$1`, [batch.id, nextStatus, req.body.warehouse_id ?? null, req.body.vehicle_id ?? null, nextStatus]);
         const updated = await client.query(`SELECT ${BATCH_FIELDS} FROM ${BATCH_FROM} WHERE b.id=$1`, [batch.id]);
         await client.query("COMMIT");
         return res.json({ success: true, data: updated.rows[0] });
