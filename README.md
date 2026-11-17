@@ -36,7 +36,7 @@ npm start
 ## Luồng lô hàng
 
 1. Agri-Audit gửi yêu cầu lấy lô hàng đến địa chỉ nông dân.
-2. Nhân viên Cold Chain gán kho/xe và cập nhật trạng thái `PICKUP_ASSIGNED`, `PICKED_UP`, `AT_INSPECTION`.
+2. Nhân viên Cold Chain chọn xe và kho tiếp nhận; lô chuyển sang `PICKUP_ASSIGNED` (đang đi lấy hàng). Khi hàng về kho, nhân viên xác nhận để chuyển `PICKED_UP`, rồi bàn giao kiểm định ở trạng thái `AT_INSPECTION`.
 3. Agri-Audit gửi quyết định kiểm định. `APPROVED` chuyển lô sang `DELIVERY_READY`; Cold Chain giao đến `consumption_address`. `REJECTED` chuyển sang `RETURN_READY`; địa chỉ trả hàng là `pickup_address`.
 4. Nhân viên ghi nhận `OUT_FOR_DELIVERY` rồi `DELIVERED`, hoặc `OUT_FOR_RETURN` rồi `RETURNED`.
 

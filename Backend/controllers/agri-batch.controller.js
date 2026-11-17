@@ -190,6 +190,32 @@ async function transitionBatch(req, res) {
         if (!(OPERATOR_TRANSITIONS[batch.logistics_status] || []).includes(nextStatus)) {
             await client.query("ROLLBACK"); return sendError(res, 409, `Transition ${batch.logistics_status} -> ${nextStatus} is not allowed`);
         }
+        if (nextStatus === "PICKUP_ASSIGNED") {
+            const vehicleId = Number(req.body.vehicle_id);
+            const warehouseId = Number(req.body.warehouse_id);
+            if (!Number.isSafeInteger(vehicleId) || vehicleId <= 0 || !Number.isSafeInteger(warehouseId) || warehouseId <= 0) {
+                await client.query("ROLLBACK");
+                return sendError(res, 400, "Choose an active vehicle and receiving warehouse");
+            }
+            const vehicle = await client.query("SELECT id FROM delivery_vehicle WHERE id=$1 AND status='ACTIVE' FOR UPDATE", [vehicleId]);
+            if (!vehicle.rowCount) {
+                await client.query("ROLLBACK");
+                return sendError(res, 409, "Selected vehicle is not active");
+            }
+            const occupied = await client.query(`SELECT batch_id FROM cold_chain_batch_operations
+                WHERE vehicle_id=$1 AND batch_id<>$2
+                AND logistics_status IN ('PICKUP_ASSIGNED','PICKED_UP','OUT_FOR_DELIVERY','OUT_FOR_RETURN')
+                LIMIT 1`, [vehicleId, batch.id]);
+            if (occupied.rowCount) {
+                await client.query("ROLLBACK");
+                return sendError(res, 409, "Selected vehicle is already assigned to another active batch");
+            }
+            const warehouse = await client.query("SELECT id FROM warehouse WHERE id=$1 AND status='ACTIVE'", [warehouseId]);
+            if (!warehouse.rowCount) {
+                await client.query("ROLLBACK");
+                return sendError(res, 409, "Selected receiving warehouse is not active");
+            }
+        }
         if (nextStatus === "OUT_FOR_DELIVERY" && batch.inspection_decision !== "APPROVED") {
             await client.query("ROLLBACK"); return sendError(res, 409, "Only approved batches can be sent to the consumption point");
         }

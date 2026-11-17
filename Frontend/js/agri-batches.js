@@ -1,7 +1,7 @@
 const logisticsLabels = {
     PICKUP_REQUESTED: "Chờ điều xe lấy hàng",
-    PICKUP_ASSIGNED: "Đã điều xe lấy hàng",
-    PICKED_UP: "Đã lấy hàng",
+    PICKUP_ASSIGNED: "Đang đi lấy hàng",
+    PICKED_UP: "Hàng đã về kho",
     AT_INSPECTION: "Đã bàn giao kiểm định",
     DELIVERY_READY: "Đã duyệt · chờ giao điểm tiêu thụ",
     RETURN_READY: "Bị từ chối · chờ hoàn nông dân",
@@ -27,12 +27,15 @@ let assignedAssets = { vehicles: [], warehouses: [] };
 let knownBatchCodes = null;
 let refreshInProgress = false;
 let noticeTimeout;
+const pendingAssignments = new Map();
 
 const safe = (value) => String(value ?? "—").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 
 async function loadAssignedAssets() {
     const [vehicles, warehouses] = await Promise.all([api.get("/vehicles"), api.get("/warehouses")]);
-    assignedAssets.vehicles = vehicles.success && Array.isArray(vehicles.data) ? vehicles.data : [];
+    assignedAssets.vehicles = vehicles.success && Array.isArray(vehicles.data)
+        ? [...new Map(vehicles.data.map((vehicle) => [String(vehicle.id), vehicle])).values()]
+        : [];
     assignedAssets.warehouses = warehouses.success && Array.isArray(warehouses.data) ? warehouses.data : [];
 }
 
@@ -76,19 +79,37 @@ async function loadAgriBatches({ quiet = false } = {}) {
 }
 
 function batchAction(batch) {
+    if (batch.logistics_status === "PICKUP_REQUESTED") {
+        const vehicles = assignedAssets.vehicles.filter((vehicle) =>
+            vehicle.status === "ACTIVE" && (!vehicle.active_batch_code || vehicle.active_batch_code === batch.external_batch_code));
+        const warehouses = assignedAssets.warehouses.filter((warehouse) => warehouse.status === "ACTIVE");
+        if (!vehicles.length) return "<span>Chưa có xe trống đang hoạt động</span>";
+        if (!warehouses.length) return "<span>Chưa có kho đang hoạt động</span>";
+        const selected = pendingAssignments.get(String(batch.id)) || {};
+        return `<div class="batch-assignment">
+            <select class="batch-assignment-vehicle" data-batch-id="${batch.id}" aria-label="Chọn xe lấy hàng">
+                <option value="">Chọn xe lấy hàng</option>
+                ${vehicles.map((vehicle) => `<option value="${vehicle.id}" ${String(selected.vehicleId) === String(vehicle.id) ? "selected" : ""}>${safe(vehicle.license_plate)} · #${safe(vehicle.id)}</option>`).join("")}
+            </select>
+            <select class="batch-assignment-warehouse" data-batch-id="${batch.id}" aria-label="Chọn kho tiếp nhận">
+                <option value="">Chọn kho tiếp nhận</option>
+                ${warehouses.map((warehouse) => `<option value="${warehouse.id}" ${String(selected.warehouseId) === String(warehouse.id) ? "selected" : ""}>${safe(warehouse.warehouse_name)}</option>`).join("")}
+            </select>
+            <button class="batch-action" data-batch-id="${batch.id}" data-action="assign-pickup" ${!selected.vehicleId || !selected.warehouseId ? "disabled" : ""}>Điều xe lấy hàng</button>
+        </div>`;
+    }
+
     const nextStatus = nextLogisticsStatus[batch.logistics_status];
     if (!nextStatus) return "<span>Không còn thao tác</span>";
-    const disabled = ["PICKUP_ASSIGNED"].includes(batch.logistics_status) && assignedAssets.vehicles.length === 0;
     const text = {
-        PICKUP_REQUESTED: "Chọn xe & điều phối",
-        PICKUP_ASSIGNED: "Xác nhận đã lấy",
+        PICKUP_ASSIGNED: "Xác nhận hàng đã về kho",
         PICKED_UP: "Bàn giao kiểm định",
         DELIVERY_READY: "Xuất phát giao hàng",
         RETURN_READY: "Xuất phát hoàn hàng",
         OUT_FOR_DELIVERY: "Xác nhận đã giao",
         OUT_FOR_RETURN: "Xác nhận đã hoàn"
     }[batch.logistics_status];
-    return `<button class="batch-action" data-batch-id="${batch.id}" data-next-status="${nextStatus}" ${disabled ? "disabled title='Chưa có xe vận chuyển trong database'" : ""}>${text}</button>`;
+    return `<button class="batch-action" data-batch-id="${batch.id}" data-next-status="${nextStatus}">${text}</button>`;
 }
 
 function renderAgriBatches() {
@@ -128,19 +149,16 @@ function renderAgriBatches() {
     }).join("");
 }
 
-async function updateAgriBatchStatus(batchId, nextStatus) {
+async function updateAgriBatchStatus(batchId, nextStatus, assignment = {}) {
     const payload = { logistics_status: nextStatus };
-    const batch = agriBatches.find((item) => String(item.id) === String(batchId));
-    if (batch.logistics_status === "PICKUP_REQUESTED") {
-        if (!assignedAssets.vehicles.length) return;
-        const vehicleId = window.prompt(`Nhập ID xe có trong hệ thống (${assignedAssets.vehicles.map((v) => `${v.id}: ${v.license_plate}`).join(", ")})`);
-        if (!vehicleId || !assignedAssets.vehicles.some((v) => String(v.id) === vehicleId)) return;
-        payload.vehicle_id = Number(vehicleId);
-        const warehouseId = window.prompt(`Nhập ID kho/điểm kiểm định (${assignedAssets.warehouses.map((w) => `${w.id}: ${w.warehouse_name}`).join(", ")})`);
-        if (warehouseId && assignedAssets.warehouses.some((w) => String(w.id) === warehouseId)) payload.warehouse_id = Number(warehouseId);
+    if (nextStatus === "PICKUP_ASSIGNED") {
+        if (!assignment.vehicleId || !assignment.warehouseId) throw new Error("Hãy chọn xe và kho tiếp nhận trước khi điều phối");
+        payload.vehicle_id = Number(assignment.vehicleId);
+        payload.warehouse_id = Number(assignment.warehouseId);
     }
     const res = await api.request(`/agri-batches/${batchId}/logistics-status`, { method: "PATCH", body: JSON.stringify(payload) });
     if (!res.success) throw new Error(res.message || "Không cập nhật được trạng thái");
+    pendingAssignments.delete(String(batchId));
     await loadAgriBatches();
 }
 
@@ -151,11 +169,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("batch-status-filter").addEventListener("change", renderAgriBatches);
     document.getElementById("batch-search").addEventListener("input", renderAgriBatches);
     document.getElementById("batch-refresh").addEventListener("click", loadAgriBatches);
+    document.getElementById("batch-table-body").addEventListener("change", (event) => {
+        const select = event.target.closest(".batch-assignment-vehicle, .batch-assignment-warehouse");
+        if (!select) return;
+        const key = String(select.dataset.batchId);
+        const selected = pendingAssignments.get(key) || {};
+        if (select.classList.contains("batch-assignment-vehicle")) selected.vehicleId = select.value;
+        else selected.warehouseId = select.value;
+        pendingAssignments.set(key, selected);
+        const action = document.querySelector(`button[data-batch-id="${CSS.escape(key)}"][data-action="assign-pickup"]`);
+        if (action) action.disabled = !selected.vehicleId || !selected.warehouseId;
+    });
     document.getElementById("batch-table-body").addEventListener("click", async (event) => {
         const button = event.target.closest("button[data-batch-id]");
         if (!button) return;
         button.disabled = true;
-        try { await updateAgriBatchStatus(button.dataset.batchId, button.dataset.nextStatus); }
+        try {
+            if (button.dataset.action === "assign-pickup") {
+                const assignment = pendingAssignments.get(String(button.dataset.batchId)) || {};
+                await updateAgriBatchStatus(button.dataset.batchId, "PICKUP_ASSIGNED", assignment);
+            } else {
+                await updateAgriBatchStatus(button.dataset.batchId, button.dataset.nextStatus);
+            }
+        }
         catch (error) { window.alert(error.message); button.disabled = false; }
     });
 });
