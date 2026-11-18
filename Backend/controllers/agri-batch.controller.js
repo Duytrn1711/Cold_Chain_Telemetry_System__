@@ -6,10 +6,14 @@ const BATCH_FIELDS = `
     o.pickup_latitude, o.pickup_longitude, o.consumption_point_name, o.consumption_address,
     o.consumption_latitude, o.consumption_longitude, b.quantity, b.unit,
     b.production_date, b.expiry_date, o.inspection_decision, o.decision_reason,
-    o.logistics_status, o.warehouse_id, o.vehicle_id, o.source_payload,
+    o.logistics_status, o.warehouse_id, w.warehouse_name,
+    o.vehicle_id, v.license_plate AS vehicle_license_plate, o.source_payload,
     o.created_at, o.updated_at, o.decided_at, o.completed_at
 `;
-const BATCH_FROM = `agri_batches b JOIN cold_chain_batch_operations o ON o.batch_id = b.id`;
+const BATCH_FROM = `agri_batches b
+    JOIN cold_chain_batch_operations o ON o.batch_id = b.id
+    LEFT JOIN warehouse w ON w.id = o.warehouse_id
+    LEFT JOIN delivery_vehicle v ON v.id = o.vehicle_id`;
 
 const INTEGRATION_TRANSITIONS = { PENDING: "AT_INSPECTION", APPROVED: "DELIVERY_READY", REJECTED: "RETURN_READY" };
 const OPERATOR_TRANSITIONS = {

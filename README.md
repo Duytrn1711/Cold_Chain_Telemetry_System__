@@ -132,6 +132,8 @@ Các endpoint dưới cần JWT. Danh sách lô yêu cầu vai trò STAFF trở 
 - `GET /api/agri-batches/:id`
 - `PATCH /api/agri-batches/:id/logistics-status`
 
+Danh sách và chi tiết lô trả thêm `vehicle_license_plate` (biển số xe đã chọn) và `warehouse_name` (kho tiếp nhận), bên cạnh `vehicle_id`, `warehouse_id`, `logistics_status` và `external_batch_code`. Hai trường tên xe/kho là `null` trước khi điều phối.
+
 Ví dụ body cập nhật:
 
 ```json
