@@ -331,24 +331,40 @@ function initNotificationsDrawer() {
     menu.innerHTML = `
         <div class="dropdown-header" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <strong style="font-size:13px; color:#0f172a;">Live Alerts &amp; Incidents</strong>
+                <strong style="font-size:13px; color:#0f172a;">Thông báo hệ thống</strong>
                 <span class="badge badge-critical" style="font-size:10px; margin-left:6px;" id="notif-count-badge">0</span>
             </div>
-            <span style="font-size:11px; color:#64748b;">Latest database alerts</span>
+            <span style="font-size:11px; color:#64748b;">Cảnh báo và lô hàng mới</span>
         </div>
-        <div class="notification-list" id="notification-items-list"><div style="padding:24px;text-align:center;color:#64748b">Loading alerts…</div></div>
+        <div class="notification-list" id="notification-items-list"><div style="padding:24px;text-align:center;color:#64748b">Đang tải thông báo…</div></div>
         <div style="padding:10px 16px; background:#f8fafc; border-top:1px solid #e2e8f0; text-align:center;">
-            <a href="#" style="font-size:12px; font-weight:700; color:#2563eb; text-decoration:none;" onclick="goToAlertsPage(); return false;">Open Incident Center →</a>
+            <a href="#" style="font-size:12px; font-weight:700; color:#2563eb; text-decoration:none;" data-notification-nav="batches">Mở trang Agri Batch Logistics →</a>
         </div>
     `;
     wrapper.appendChild(menu);
     loadNotificationAlerts();
+    window.setInterval(loadNotificationAlerts, 15000);
 
     notifBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         closeProfileMenu();
         menu.classList.toggle("show");
+        if (menu.classList.contains("show")) loadNotificationAlerts();
+    });
+
+    menu.addEventListener("click", (event) => {
+        const item = event.target.closest("[data-notification-kind], [data-notification-nav]");
+        if (!item) return;
+        event.preventDefault();
+        if (item.dataset.notificationKind === "batch") {
+            markBatchNotificationRead(item.dataset.batchCode);
+            goToAgriBatchesPage();
+        } else if (item.dataset.notificationKind === "alert") {
+            goToAlertsPage();
+        } else if (item.dataset.notificationNav === "batches") {
+            goToAgriBatchesPage();
+        }
     });
 
     document.addEventListener("click", (e) => {
@@ -377,17 +393,100 @@ function goToAlertsPage() {
     window.location.href = isSub ? "alerts.html" : "pages/alerts.html";
 }
 
+function goToAgriBatchesPage() {
+    closeMenus();
+    const isSub = window.location.pathname.includes("/pages/");
+    window.location.href = isSub ? "agri-batches.html" : "pages/agri-batches.html";
+}
+
+function batchNotificationStorageKey(kind) {
+    const user = api.getCurrentUser() || {};
+    const identity = String(user.id || user.username || "session").toLowerCase();
+    return `coldchain_agri_batch_${kind}_v1_${identity}`;
+}
+
+function readStoredJson(key, fallback) {
+    try {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : fallback;
+    } catch (error) { return fallback; }
+}
+
+function readBatchNotifications() {
+    const value = readStoredJson(batchNotificationStorageKey("notifications"), []);
+    return Array.isArray(value) ? value : [];
+}
+
+function markBatchNotificationRead(batchCode) {
+    const notifications = readBatchNotifications().map((item) =>
+        item.batchCode === batchCode ? { ...item, read: true } : item);
+    localStorage.setItem(batchNotificationStorageKey("notifications"), JSON.stringify(notifications));
+}
+
+async function syncNewBatchNotifications() {
+    const response = await api.get("/agri-batches");
+    if (!response.success || !Array.isArray(response.data)) return;
+    const currentCodes = [...new Set(response.data.map((batch) => batch.external_batch_code).filter(Boolean))];
+    const knownValue = readStoredJson(batchNotificationStorageKey("known_codes"), null);
+    const notifications = readBatchNotifications();
+
+    // Seed existing batches on first visit so historical imports do not create a flood of notifications.
+    if (!Array.isArray(knownValue)) {
+        localStorage.setItem(batchNotificationStorageKey("known_codes"), JSON.stringify(currentCodes));
+        return;
+    }
+
+    const knownCodes = new Set(knownValue);
+    const newBatches = response.data.filter((batch) => batch.external_batch_code && !knownCodes.has(batch.external_batch_code));
+    if (newBatches.length) {
+        const seenNotifications = new Set(notifications.map((item) => item.batchCode));
+        const createdAt = new Date().toISOString();
+        newBatches.forEach((batch) => {
+            if (!seenNotifications.has(batch.external_batch_code)) {
+                notifications.unshift({
+                    batchCode: batch.external_batch_code,
+                    productName: batch.product_name || "Lô nông sản",
+                    createdAt,
+                    read: false
+                });
+            }
+        });
+        localStorage.setItem(batchNotificationStorageKey("notifications"), JSON.stringify(notifications.slice(0, 30)));
+    }
+    localStorage.setItem(batchNotificationStorageKey("known_codes"), JSON.stringify(currentCodes));
+}
+
 async function loadNotificationAlerts() {
     const list = document.getElementById("notification-items-list");
     const badge = document.getElementById("notif-count-badge");
     if (!list) return;
+    if (loadNotificationAlerts.running) return;
+    loadNotificationAlerts.running = true;
+    const safe = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    let alerts = [];
     try {
         const response = await api.get("/alerts");
-        const alerts = Array.isArray(response.data) ? response.data : (Array.isArray(response.data?.list) ? response.data.list : []);
-        const safe = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-        if (badge) badge.textContent = String(alerts.filter(a => a.status !== "RESOLVED").length);
-        list.innerHTML = alerts.length ? alerts.slice(0, 10).map(a => `<div class="notification-item ${String(a.alert_type || "").toUpperCase().includes("HIGH") ? "critical" : ""}" onclick="goToAlertsPage()"><div class="notification-icon">⚠️</div><div class="notification-content"><div class="notification-title">${safe(a.alert_type || "Alert")} · ${safe(a.alert_content || "")}</div><div class="notification-time">${a.created_at ? new Date(a.created_at).toLocaleString() : ""}</div></div></div>`).join("") : `<div style="padding:24px;text-align:center;color:#64748b">No alerts in the database</div>`;
-    } catch (error) { list.innerHTML = `<div style="padding:24px;text-align:center;color:#64748b">Could not load alerts</div>`; }
+        alerts = Array.isArray(response.data) ? response.data : (Array.isArray(response.data?.list) ? response.data.list : []);
+    } catch (error) { /* Batch notifications should still load if alerts are unavailable. */ }
+    try { await syncNewBatchNotifications(); } catch (error) { /* Keep the drawer usable if batch access is unavailable. */ }
+
+    const batchNotifications = readBatchNotifications();
+    const unreadBatches = batchNotifications.filter((item) => !item.read).length;
+    const activeAlerts = alerts.filter((alert) => alert.status !== "RESOLVED");
+    if (badge) badge.textContent = String(activeAlerts.length + unreadBatches);
+    const headerDot = document.querySelector(".header-action-btn .header-badge-dot");
+    if (headerDot) headerDot.style.display = activeAlerts.length + unreadBatches ? "block" : "none";
+
+    const batchItems = batchNotifications.slice(0, 10).map((item) => `
+        <div class="notification-item ${item.read ? "" : "unread"}" data-notification-kind="batch" data-batch-code="${safe(item.batchCode)}">
+            <div class="notification-icon">📦</div><div class="notification-content">
+                <div class="notification-title">Lô hàng mới từ Agri-Audit · ${safe(item.batchCode)} · ${safe(item.productName)}</div>
+                <div class="notification-time">${item.createdAt ? new Date(item.createdAt).toLocaleString() : ""} · Bấm để mở lô hàng</div>
+            </div>
+        </div>`).join("");
+    const alertItems = alerts.slice(0, 10).map((alert) => `<div class="notification-item ${String(alert.alert_type || "").toUpperCase().includes("HIGH") ? "critical" : ""}" data-notification-kind="alert"><div class="notification-icon">⚠️</div><div class="notification-content"><div class="notification-title">${safe(alert.alert_type || "Alert")} · ${safe(alert.alert_content || "")}</div><div class="notification-time">${alert.created_at ? new Date(alert.created_at).toLocaleString() : ""}</div></div></div>`).join("");
+    list.innerHTML = batchItems + alertItems || `<div style="padding:24px;text-align:center;color:#64748b">Chưa có thông báo</div>`;
+    loadNotificationAlerts.running = false;
 }
 
 function markAllNotifsRead() {

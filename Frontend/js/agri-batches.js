@@ -143,7 +143,7 @@ function renderAgriBatches() {
             <td>${safe(batch.pickup_address)}</td>
             <td>${safe(destination)}${batch.consumption_point_name && batch.consumption_address && !isReturn ? `<small>${safe(batch.consumption_point_name)}</small>` : ""}</td>
             <td>${safe(batch.quantity)} ${safe(batch.unit)}</td>
-            <td><span class="batch-status">${safe(inspectionLabels[batch.inspection_decision] || batch.inspection_decision)}</span>${batch.decision_reason ? `<small>${safe(batch.decision_reason)}</small>` : ""}</td>
+            <td><span class="batch-status ${batch.inspection_decision === "APPROVED" ? "inspection-approved" : batch.inspection_decision === "REJECTED" ? "inspection-rejected" : "inspection-pending"}">${safe(inspectionLabels[batch.inspection_decision] || batch.inspection_decision)}</span>${batch.decision_reason ? `<small>${safe(batch.decision_reason)}</small>` : ""}</td>
             <td>${safe(logisticsLabels[batch.logistics_status] || batch.logistics_status)}${batch.warehouse_id ? `<small>Điểm kiểm định #${safe(batch.warehouse_id)}</small>` : ""}</td>
             <td>${safe(vehicle?.license_plate || "Chưa gán xe")}<small>${batchAction(batch)}</small></td>
         </tr>`;
