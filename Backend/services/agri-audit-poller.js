@@ -84,7 +84,8 @@ function extractDestination(batch) {
             typeof batch.consumption_point === "string" ? batch.consumption_point : null,
             destination.name, destination.point_name, consumptionPoint.name),
         address: firstText(batch.consumption_address, batch.destination_address, batch.destination_point_address,
-            batch.consumption_point_address, destination.address, destination.full_address, consumptionPoint.address),
+            batch.consumption_point_address, typeof batch.destination === "string" ? batch.destination : null,
+            destination.address, destination.full_address, consumptionPoint.address),
         latitude: batch.consumption_latitude ?? batch.destination_latitude ?? destination.latitude ?? consumptionPoint.latitude ?? null,
         longitude: batch.consumption_longitude ?? batch.destination_longitude ?? destination.longitude ?? consumptionPoint.longitude ?? null
     };
