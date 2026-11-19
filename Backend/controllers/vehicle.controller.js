@@ -170,18 +170,28 @@ exports.getVehicleById = async (req, res) => {
 // POST /api/vehicles - Thêm xe tải lạnh mới
 exports.createVehicle = async (req, res) => {
     try {
-        const { license_plate, warehouse_id, status = "ACTIVE" } = req.body;
+        const licensePlate = typeof req.body.license_plate === "string" ? req.body.license_plate.trim().toUpperCase() : "";
+        const warehouseId = Number(req.body.warehouse_id);
+        const status = String(req.body.status || "ACTIVE").trim().toUpperCase();
 
-        if (!license_plate || !warehouse_id) {
+        if (licensePlate.length < 4 || licensePlate.length > 20 || !Number.isSafeInteger(warehouseId) || warehouseId <= 0) {
             return res.status(400).json({
                 success: false,
                 data: null,
-                message: "Vui lòng nhập biển số xe (license_plate) và chọn kho trực thuộc (warehouse_id)"
+                message: "Vui lòng nhập biển số xe hợp lệ (4–20 ký tự) và chọn kho trực thuộc"
             });
+        }
+        if (!["ACTIVE", "IN_TRANSIT", "IDLE"].includes(status)) {
+            return res.status(400).json({ success: false, data: null, message: "Trạng thái xe không hợp lệ" });
+        }
+
+        const warehouse = await pool.query("SELECT id FROM warehouse WHERE id = $1", [warehouseId]);
+        if (!warehouse.rowCount) {
+            return res.status(400).json({ success: false, data: null, message: "Kho được chọn không tồn tại. Hãy tải lại danh sách kho." });
         }
 
         // Kiểm tra trùng biển số xe
-        const checkPlate = await pool.query("SELECT id FROM delivery_vehicle WHERE license_plate = $1", [license_plate]);
+        const checkPlate = await pool.query("SELECT id FROM delivery_vehicle WHERE UPPER(license_plate) = $1", [licensePlate]);
         if (checkPlate.rows.length > 0) {
             return res.status(400).json({
                 success: false,
@@ -197,7 +207,7 @@ exports.createVehicle = async (req, res) => {
             INSERT INTO delivery_vehicle (id, license_plate, warehouse_id, status, created_at)
             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
             RETURNING *
-        `, [nextId, license_plate, warehouse_id, status]);
+        `, [nextId, licensePlate, warehouseId, status]);
 
         return res.status(201).json({
             success: true,
@@ -206,6 +216,12 @@ exports.createVehicle = async (req, res) => {
         });
     } catch (error) {
         console.error("Vehicle createVehicle error:", error);
+        if (error.code === "23505") {
+            return res.status(409).json({ success: false, data: null, message: "Biển số xe này đã tồn tại trong hệ thống" });
+        }
+        if (error.code === "23503") {
+            return res.status(400).json({ success: false, data: null, message: "Kho được chọn không tồn tại. Hãy tải lại danh sách kho." });
+        }
         return res.status(500).json({
             success: false,
             data: null,

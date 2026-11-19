@@ -137,14 +137,32 @@ exports.getWarehouseById = async (req, res) => {
 // POST /api/warehouses - Thêm mới kho lạnh
 exports.createWarehouse = async (req, res) => {
     try {
-        const { warehouse_name, longitude, latitude, status = "ACTIVE" } = req.body;
+        const body = req.body || {};
+        const warehouseName = typeof body.warehouse_name === "string" ? body.warehouse_name.trim() : "";
+        const readCoordinate = (value) => value === undefined || value === null || value === "" ? null : Number(value);
+        const latitude = readCoordinate(body.latitude);
+        const longitude = readCoordinate(body.longitude);
+        const status = String(body.status || "ACTIVE").trim().toUpperCase();
 
-        if (!warehouse_name) {
+        if (warehouseName.length < 2 || warehouseName.length > 255) {
             return res.status(400).json({
                 success: false,
                 data: null,
-                message: "Tên kho lạnh không được để trống"
+                message: "Tên kho cần có từ 2 đến 255 ký tự"
             });
+        }
+        if ((latitude === null) !== (longitude === null) ||
+            (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) ||
+            (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))) {
+            return res.status(400).json({ success: false, data: null, message: "Tọa độ không hợp lệ. Hãy nhập cả vĩ độ (-90 đến 90) và kinh độ (-180 đến 180), hoặc để trống cả hai." });
+        }
+        if (!["ACTIVE", "INACTIVE"].includes(status)) {
+            return res.status(400).json({ success: false, data: null, message: "Trạng thái kho không hợp lệ" });
+        }
+
+        const duplicate = await pool.query("SELECT id FROM warehouse WHERE LOWER(BTRIM(warehouse_name)) = LOWER($1) LIMIT 1", [warehouseName]);
+        if (duplicate.rowCount) {
+            return res.status(409).json({ success: false, data: null, message: "Tên kho này đã tồn tại trong hệ thống" });
         }
 
         const maxIdRes = await pool.query("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM warehouse");
@@ -154,7 +172,7 @@ exports.createWarehouse = async (req, res) => {
             INSERT INTO warehouse (id, warehouse_name, longitude, latitude, status, created_at)
             VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
             RETURNING *
-        `, [nextId, warehouse_name, longitude || null, latitude || null, status]);
+        `, [nextId, warehouseName, longitude, latitude, status]);
 
         return res.status(201).json({
             success: true,

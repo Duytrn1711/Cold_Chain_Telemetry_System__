@@ -229,7 +229,10 @@ function initModal() {
 
     if (!modal) return;
 
-    const showModal = () => modal.classList.add("show");
+    const showModal = () => {
+        if (window.Roles && !Roles.guard("write", "Staff accounts cannot add warehouses.")) return;
+        modal.classList.add("show");
+    };
     const hideModal = () => {
         modal.classList.remove("show");
         if (form) form.reset();
@@ -250,23 +253,37 @@ function initModal() {
             const lat = document.getElementById("new-wh-lat").value;
             const lng = document.getElementById("new-wh-lng").value;
             const status = document.getElementById("new-wh-status").value;
+            const submitButton = form.querySelector('[type="submit"]');
 
-            if (!name) {
-                showToast("Please enter a warehouse facility name", "error");
+            if (name.length < 2 || name.length > 255) {
+                showToast("Tên kho cần có từ 2 đến 255 ký tự", "warning");
+                return;
+            }
+            if (Boolean(lat) !== Boolean(lng)) {
+                showToast("Hãy nhập cả vĩ độ và kinh độ, hoặc để trống cả hai", "warning");
+                return;
+            }
+            const latitude = lat === "" ? null : Number(lat);
+            const longitude = lng === "" ? null : Number(lng);
+            if ((latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) ||
+                (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))) {
+                showToast("Tọa độ không hợp lệ: vĩ độ từ -90 đến 90, kinh độ từ -180 đến 180", "warning");
                 return;
             }
 
+            if (submitButton) submitButton.disabled = true;
             try {
                 const res = await api.post("/warehouses", {
                     warehouse_name: name,
-                    latitude: lat ? parseFloat(lat) : null,
-                    longitude: lng ? parseFloat(lng) : null,
+                    latitude,
+                    longitude,
                     status: status || "ACTIVE"
                 });
 
                 if (res.success) {
                     showToast("Warehouse registered successfully!", "success");
                     hideModal();
+                    if (res.data?.id !== undefined) selectedWarehouseId = res.data.id;
                     await loadWarehouses();
                 } else {
                     showToast(res.message || "Could not create warehouse", "error");
@@ -274,6 +291,8 @@ function initModal() {
             } catch (err) {
                 console.error("Create warehouse error:", err);
                 showToast(err.message || "Server error creating warehouse", "error");
+            } finally {
+                if (submitButton) submitButton.disabled = false;
             }
         });
     }

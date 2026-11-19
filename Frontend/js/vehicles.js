@@ -524,18 +524,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         addForm.addEventListener("submit", async (e) => {
             e.preventDefault();
             const plate = document.getElementById("new-veh-plate").value.trim();
-            const whId = document.getElementById("new-veh-wh").value;
+            const whId = Number(document.getElementById("new-veh-wh").value);
             const status = document.getElementById("new-veh-status").value;
+            const submitButton = addForm.querySelector('[type="submit"]');
 
-            if (!plate) {
-                showToast("Please enter a license plate", "warning");
+            if (plate.length < 4 || plate.length > 20) {
+                showToast("Biển số xe cần có từ 4 đến 20 ký tự", "warning");
+                return;
+            }
+            if (!Number.isSafeInteger(whId) || whId <= 0) {
+                showToast("Hãy chọn kho trực thuộc trước khi lưu xe", "warning");
                 return;
             }
 
+            if (submitButton) submitButton.disabled = true;
             try {
                 const res = await api.post("/vehicles", {
                     license_plate: plate,
-                    warehouse_id: parseInt(whId, 10),
+                    warehouse_id: whId,
                     status: status
                 });
 
@@ -549,6 +555,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
             } catch (err) {
                 showToast(err.message || "Error creating vehicle", "error");
+            } finally {
+                if (submitButton) submitButton.disabled = false;
             }
         });
     }
@@ -589,13 +597,25 @@ async function populateVehicleWarehouses() {
     try {
         const response = await api.get("/warehouses");
         const warehouses = response.success && Array.isArray(response.data) ? response.data : [];
-        const options = '<option value="">Select a warehouse</option>' + warehouses.map(item => `<option value="${item.id}">${item.warehouse_name}</option>`).join("");
+        const options = warehouses.length
+            ? '<option value="">Chọn kho trực thuộc</option>' + warehouses.map(item => `<option value="${item.id}">${String(item.warehouse_name || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))}</option>`).join("")
+            : '<option value="">Chưa có kho trong hệ thống</option>';
         ["new-veh-wh", "edit-veh-wh"].forEach(id => {
             const select = document.getElementById(id);
-            if (select) select.innerHTML = options;
+            if (select) {
+                select.innerHTML = options;
+                select.disabled = warehouses.length === 0;
+            }
         });
     } catch (error) {
         console.error("Could not load vehicle warehouse assignments:", error);
+        ["new-veh-wh", "edit-veh-wh"].forEach(id => {
+            const select = document.getElementById(id);
+            if (select) {
+                select.innerHTML = '<option value="">Không tải được danh sách kho</option>';
+                select.disabled = true;
+            }
+        });
     }
 }
 
