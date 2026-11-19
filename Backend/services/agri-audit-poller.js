@@ -71,6 +71,25 @@ function hasValidBatch(batch) {
         typeof batch.unit === "string" && batch.unit.trim();
 }
 
+function firstText(...values) {
+    return values.find((value) => typeof value === "string" && value.trim())?.trim() || null;
+}
+
+function extractDestination(batch) {
+    const destination = batch.destination && typeof batch.destination === "object" ? batch.destination : {};
+    const consumptionPoint = batch.consumption_point && typeof batch.consumption_point === "object"
+        ? batch.consumption_point : {};
+    return {
+        name: firstText(batch.consumption_point_name, batch.destination_name, batch.destination_point_name,
+            typeof batch.consumption_point === "string" ? batch.consumption_point : null,
+            destination.name, destination.point_name, consumptionPoint.name),
+        address: firstText(batch.consumption_address, batch.destination_address, batch.destination_point_address,
+            batch.consumption_point_address, destination.address, destination.full_address, consumptionPoint.address),
+        latitude: batch.consumption_latitude ?? batch.destination_latitude ?? destination.latitude ?? consumptionPoint.latitude ?? null,
+        longitude: batch.consumption_longitude ?? batch.destination_longitude ?? destination.longitude ?? consumptionPoint.longitude ?? null
+    };
+}
+
 async function syncDecisionIfReady(client, batchCode, batch, operation) {
     const auditStatus = String(batch.status || "").toUpperCase();
     const decision = auditStatus === "AUDITED" ? "APPROVED" : auditStatus === "REJECTED" ? "REJECTED" : null;
@@ -104,6 +123,7 @@ async function syncDecisionIfReady(client, batchCode, batch, operation) {
 async function syncOneBatch(batch) {
     if (!hasValidBatch(batch)) return "invalid";
     const batchCode = batch.batch_code.trim();
+    const destination = extractDestination(batch);
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -122,8 +142,10 @@ async function syncOneBatch(batch) {
                 batch.production_date || null, batch.expiry_date || null
             ]);
             const batchId = inserted.rows[0].id;
-            await client.query(`INSERT INTO cold_chain_batch_operations (batch_id,external_batch_code,source_payload)
-                VALUES ($1,$2,$3::jsonb)`, [batchId, batchCode, JSON.stringify(batch)]);
+            await client.query(`INSERT INTO cold_chain_batch_operations
+                (batch_id,external_batch_code,consumption_point_name,consumption_address,consumption_latitude,consumption_longitude,source_payload)
+                VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)`, [batchId, batchCode, destination.name,
+                destination.address, destination.latitude, destination.longitude, JSON.stringify(batch)]);
             await client.query(`INSERT INTO agri_batch_events (external_event_id,external_batch_code,event_type,payload)
                 VALUES ($1,$2,'PICKUP_REQUESTED',$3::jsonb) ON CONFLICT (external_event_id) DO NOTHING`, [
                 stableEventId("created", batchCode), batchCode, JSON.stringify(batch)
@@ -133,6 +155,16 @@ async function syncOneBatch(batch) {
         }
 
         const operation = existing.rows[0];
+        if (destination.name || destination.address || destination.latitude !== null || destination.longitude !== null) {
+            await client.query(`UPDATE cold_chain_batch_operations SET
+                consumption_point_name=COALESCE($2,consumption_point_name),
+                consumption_address=COALESCE($3,consumption_address),
+                consumption_latitude=COALESCE($4,consumption_latitude),
+                consumption_longitude=COALESCE($5,consumption_longitude),
+                source_payload=$6::jsonb, updated_at=CURRENT_TIMESTAMP
+                WHERE external_batch_code=$1`, [batchCode, destination.name, destination.address,
+                destination.latitude, destination.longitude, JSON.stringify(batch)]);
+        }
         const applied = await syncDecisionIfReady(client, batchCode, batch, operation);
         await client.query("COMMIT");
         return applied ? "decision" : "existing";

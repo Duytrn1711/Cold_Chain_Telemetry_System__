@@ -134,13 +134,14 @@ function renderAgriBatches() {
     }
     body.innerHTML = visible.map((batch) => {
         const isReturn = batch.inspection_decision === "REJECTED";
-        const destination = isReturn ? `Hoàn về nông dân: ${batch.pickup_address}` : (batch.consumption_address || "Đang chờ Agri cung cấp điểm tiêu thụ");
+        const destination = isReturn ? `Hoàn về nông dân: ${batch.pickup_address}` :
+            (batch.consumption_address || batch.consumption_point_name || "Đang chờ Agri cung cấp điểm tiêu thụ");
         const vehicle = assignedAssets.vehicles.find((item) => String(item.id) === String(batch.vehicle_id));
         return `<tr>
             <td><strong>${safe(batch.external_batch_code)}</strong><small>${safe(batch.product_name)}${batch.product_type ? ` · ${safe(batch.product_type)}` : ""}</small></td>
             <td>${safe(batch.producer_name)}<small>${safe(batch.producer_phone || batch.producer_email || "")}</small></td>
             <td>${safe(batch.pickup_address)}</td>
-            <td>${safe(destination)}${batch.consumption_point_name && !isReturn ? `<small>${safe(batch.consumption_point_name)}</small>` : ""}</td>
+            <td>${safe(destination)}${batch.consumption_point_name && batch.consumption_address && !isReturn ? `<small>${safe(batch.consumption_point_name)}</small>` : ""}</td>
             <td>${safe(batch.quantity)} ${safe(batch.unit)}</td>
             <td><span class="batch-status">${safe(inspectionLabels[batch.inspection_decision] || batch.inspection_decision)}</span>${batch.decision_reason ? `<small>${safe(batch.decision_reason)}</small>` : ""}</td>
             <td>${safe(logisticsLabels[batch.logistics_status] || batch.logistics_status)}${batch.warehouse_id ? `<small>Điểm kiểm định #${safe(batch.warehouse_id)}</small>` : ""}</td>

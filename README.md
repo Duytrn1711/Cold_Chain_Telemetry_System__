@@ -57,7 +57,7 @@ AGRI_AUDIT_POLL_INTERVAL_MS=5000
 
 Polling bắt đầu khi Cold Chain khởi động. Dùng tài khoản Auditor dành cho tích hợp; các thông tin đăng nhập chỉ được lưu trên backend Cold Chain, không đưa vào frontend hoặc Git. Access token được giữ trong bộ nhớ và làm mới trước khi hết hạn; nếu API Agri-Audit không truy cập được, Cold Chain ghi lỗi đã khử thông tin nhạy cảm và thử lại ở chu kỳ kế tiếp.
 
-Cold Chain tạo yêu cầu lấy hàng khi phát hiện `batch_code` mới. Khi Agri-Audit đổi trạng thái sang `AUDITED` hoặc `REJECTED`, quyết định được đồng bộ sau khi lô đã ở `AT_INSPECTION`. API danh sách hiện không cung cấp `consumption_address`; vì vậy lô được duyệt sẽ chờ địa chỉ điểm tiêu thụ trước khi xe được phép xuất phát giao hàng. API cần bổ sung trường địa chỉ này để hoàn tất giao tự động theo điểm doanh nghiệp đã chọn.
+Cold Chain tạo yêu cầu lấy hàng khi phát hiện `batch_code` mới. Poller đọc thông tin điểm tiêu thụ từ `/batches` khi tạo lô và cập nhật lại trong các chu kỳ tiếp theo, gồm `consumption_point_name` / `consumption_address` hoặc các trường tương đương `destination_*`. Khi Agri-Audit đổi trạng thái sang `AUDITED` hoặc `REJECTED`, quyết định được đồng bộ sau khi lô đã ở `AT_INSPECTION`. Nếu API Agri-Audit không trả tên/địa chỉ điểm tiêu thụ trong dữ liệu lô, Cold Chain không thể tự suy ra giá trị này; khi đó cần bổ sung trường vào phản hồi `/batches` của Agri-Audit.
 
 Polling lấy toàn bộ danh sách `/batches` mỗi chu kỳ vì API hiện chưa có bộ lọc trạng thái hoặc phân trang. Lô sẽ được phát hiện trong tối đa khoảng 5 giây sau khi Agri-Audit tạo; API đọc định kỳ không thể đảm bảo đồng bộ đúng cùng thời điểm tạo lô.
 
