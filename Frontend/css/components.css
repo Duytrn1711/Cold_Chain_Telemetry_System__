@@ -354,7 +354,8 @@
     transition: opacity 0.2s ease;
 }
 
-.modal-overlay.active {
+.modal-overlay.active,
+.modal-overlay.show {
     opacity: 1;
     pointer-events: auto;
 }
@@ -370,7 +371,8 @@
     transition: transform 0.2s ease;
 }
 
-.modal-overlay.active .modal-card {
+.modal-overlay.active .modal-card,
+.modal-overlay.show .modal-card {
     transform: translateY(0);
 }
 
