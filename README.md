@@ -147,6 +147,35 @@ Ví dụ body cập nhật:
 
 Giao diện `/pages/agri-batches.html` cho phép tra cứu lô, gán phương tiện/kho và cập nhật các bước vận chuyển. Dữ liệu lô hiển thị từ PostgreSQL.
 
+## Nhận telemetry từ Arduino
+
+`db.js` chỉ quản lý PostgreSQL connection pool; nó không đọc cổng USB/COM. Arduino có Wi-Fi (ví dụ ESP32) gửi JSON qua HTTPS đến `POST /api/integrations/arduino/telemetry`. Khi nhận gói đầu tiên, backend tự đăng ký `device_token` vào bảng `device`; mỗi gói được ghi vào bảng `data`. Nếu gói không có humidity, backend lưu `0` thay vì `NULL`. Cảnh báo nhiệt độ ngoài ngưỡng 2–8°C cũng được tạo.
+
+Cấu hình trên Render: `ARDUINO_INGEST_TOKEN` bằng một secret riêng; tùy chọn `ARDUINO_DEVICE_TOKEN` để gán cố định mã device (mặc định trong `.env.example` là `ARDUINO-ESP32-01`); tùy chọn `ARDUINO_WAREHOUSE_ID` hoặc `ARDUINO_VEHICLE_ID` để gắn device vào một kho hoặc xe. Nếu token device cố định không được cấu hình, mỗi gói phải gửi `device_token`.
+
+```text
+POST https://<cold-chain-host>/api/integrations/arduino/telemetry
+x-arduino-token: <ARDUINO_INGEST_TOKEN>
+Content-Type: application/json
+```
+
+```json
+{
+  "temperature": 5.6
+}
+```
+
+Có thể gửi thêm `humidity` nếu Arduino có cảm biến ẩm. Nếu Arduino chỉ giao tiếp USB/Serial (không có Wi-Fi), dịch vụ Cold Chain trên Render không thể đọc trực tiếp cổng COM của máy tính; cần chạy bridge trên máy đang cắm Arduino để chuyển Serial sang endpoint HTTPS này.
+
+Trên Windows, bridge có sẵn tại `Backend/scripts/arduino-serial-bridge.ps1`. Arduino cần in mỗi lần đo thành một object JSON trên một dòng, ví dụ `{"temperature":5.6,"humidity":0}`. Chạy PowerShell trên máy đang cắm Arduino; bridge sẽ hỏi secret theo dạng ẩn:
+
+```powershell
+$env:ARDUINO_DEVICE_TOKEN = "ARDUINO-ESP32-USB-01"
+.\Backend\scripts\arduino-serial-bridge.ps1 -PortName COM5 -BaudRate 9600
+```
+
+Thay `COM5` và `9600` bằng cổng COM/baud rate thật của board. Nếu `ARDUINO_DEVICE_TOKEN` đã được đặt trên Render, có thể bỏ dòng gán token device ở máy bridge. Khi nhận gói đầu tiên, Cold Chain đăng ký device tự động và bắt đầu ghi telemetry.
+
 ## Các trang giao diện
 
 | Trang | Đường dẫn |

@@ -15,6 +15,7 @@ const deviceRoutes = require("./routes/device.routes");
 const dataRoutes = require("./routes/data.routes");
 const alertRoutes = require("./routes/alert.routes");
 const agriBatchRoutes = require("./routes/agri-batch.routes");
+const arduinoRoutes = require("./routes/arduino.routes");
 const { startAgriAuditPoller } = require("./services/agri-audit-poller");
 
 const app = express();
@@ -66,6 +67,7 @@ app.use("/api/data", dataRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/agri-batches", agriBatchRoutes);
 app.use("/api/integrations/agri/batches", agriBatchRoutes);
+app.use("/api/integrations/arduino", arduinoRoutes);
 
 // Fallback route cho frontend root
 app.get("/", (req, res) => {

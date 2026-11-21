@@ -625,13 +625,13 @@ window.openAddVehicleModal = function() {
     if (modal) {
         const form = document.getElementById("add-vehicle-form");
         if (form) form.reset();
-        modal.classList.add("show");
+        modal.classList.add("active");
     }
 };
 
 window.closeAddVehicleModal = function() {
     const modal = document.getElementById("add-vehicle-modal");
-    if (modal) modal.classList.remove("show");
+    if (modal) modal.classList.remove("active");
 };
 
 window.openEditVehicleModal = function(id) {
@@ -650,12 +650,12 @@ window.openEditVehicleModal = function(id) {
     document.getElementById("edit-veh-status").value = veh.status || "ACTIVE";
 
     const modal = document.getElementById("edit-vehicle-modal");
-    if (modal) modal.classList.add("show");
+    if (modal) modal.classList.add("active");
 };
 
 window.closeEditVehicleModal = function() {
     const modal = document.getElementById("edit-vehicle-modal");
-    if (modal) modal.classList.remove("show");
+    if (modal) modal.classList.remove("active");
 };
 
 window.confirmDeleteVehicle = async function(id) {

@@ -231,10 +231,10 @@ function initModal() {
 
     const showModal = () => {
         if (window.Roles && !Roles.guard("write", "Staff accounts cannot add warehouses.")) return;
-        modal.classList.add("show");
+        modal.classList.add("active");
     };
     const hideModal = () => {
-        modal.classList.remove("show");
+        modal.classList.remove("active");
         if (form) form.reset();
     };
 
@@ -311,12 +311,12 @@ window.openEditWarehouseModal = function(id) {
     document.getElementById("edit-wh-status").value = wh.status || "ACTIVE";
 
     const modal = document.getElementById("edit-warehouse-modal");
-    if (modal) modal.classList.add("show");
+    if (modal) modal.classList.add("active");
 };
 
 window.closeEditModal = function() {
     const modal = document.getElementById("edit-warehouse-modal");
-    if (modal) modal.classList.remove("show");
+    if (modal) modal.classList.remove("active");
 };
 
 document.addEventListener("DOMContentLoaded", () => {
