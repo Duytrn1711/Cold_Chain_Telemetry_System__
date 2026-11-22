@@ -16,6 +16,11 @@ let streamChart = null;
 let pieChart = null;
 let isStreamingActive = true;
 let searchDebounceTimer = null;
+const knownTelemetryIds = new Set();
+let telemetryPollingSeeded = false;
+let telemetryPollRunning = false;
+let telemetryPollTimer = null;
+const activeExcursionDevices = new Set();
 
 document.addEventListener("DOMContentLoaded", async () => {
     await initTelemetryPage();
@@ -61,6 +66,7 @@ async function initTelemetryPage() {
     }
 
     initCharts();
+    startTelemetryPolling();
 }
 
 /**
@@ -71,12 +77,15 @@ function wireLiveTelemetryListener() {
         if (!isStreamingActive) return;
 
         const newRow = formatRawPacket(packet);
+        if (newRow.id !== undefined && newRow.id !== null && knownTelemetryIds.has(String(newRow.id))) return;
+        rememberTelemetryId(newRow.id);
         allTelemetry.unshift(newRow);
         if (allTelemetry.length > 200) allTelemetry.pop();
 
         applyTelemetryFilters();
         updateTopStats(allTelemetry);
         pushToChart(newRow);
+        notifyTelemetryExcursion(newRow);
 
         const lastSyncEl = document.getElementById("header-last-sync");
         if (lastSyncEl) {
@@ -177,6 +186,8 @@ async function loadTelemetryList() {
         const res = await api.get("/data", { limit: 100 });
         if (res.success && res.data && Array.isArray(res.data.list)) {
             allTelemetry = res.data.list.map(formatRawPacket);
+            allTelemetry.forEach((row) => rememberTelemetryId(row.id));
+            telemetryPollingSeeded = true;
         } else {
             allTelemetry = [];
         }
@@ -215,6 +226,7 @@ function formatRawPacket(row) {
         battery: null,
         rssi: null,
         latency: null,
+        created_at_raw: row.created_at || null,
         created_at: row.created_at ? new Date(row.created_at).toLocaleString() : "—",
         status,
         raw: row
@@ -662,7 +674,7 @@ function initStreamChart() {
 
     const ctx = canvas.getContext("2d");
     const reversed = [...allTelemetry].slice(0, 16).reverse();
-    const labels = reversed.map(r => r.created_at.slice(11, 19));
+    const labels = reversed.map(telemetryTimeLabel);
     const tempData = reversed.map(r => r.temperature);
 
     streamChart = new Chart(ctx, {
@@ -722,7 +734,7 @@ function initStreamChart() {
             scales: {
                 y: {
                     min: 0,
-                    max: 14,
+                    max: 10,
                     ticks: {
                         callback: (v) => `${v}°C`
                     },
@@ -736,6 +748,7 @@ function initStreamChart() {
             }
         }
     });
+    updateStreamChartScale();
 }
 
 function initPieChart() {
@@ -771,7 +784,7 @@ function initPieChart() {
 
 function pushToChart(packet) {
     if (!streamChart) return;
-    const label = packet.created_at.slice(11, 19);
+    const label = telemetryTimeLabel(packet);
     streamChart.data.labels.push(label);
     streamChart.data.datasets[0].data.push(packet.temperature);
     streamChart.data.datasets[1].data.push(8.0);
@@ -784,17 +797,104 @@ function pushToChart(packet) {
         streamChart.data.datasets[2].data.shift();
     }
 
+    updateStreamChartScale();
     streamChart.update();
 }
 
 function refreshTelemetryChart() {
     if (streamChart) {
         const reversed = [...allTelemetry].slice(0, 16).reverse();
-        streamChart.data.labels = reversed.map(r => r.created_at.slice(11, 19));
+        streamChart.data.labels = reversed.map(telemetryTimeLabel);
         streamChart.data.datasets[0].data = reversed.map(r => r.temperature);
         streamChart.data.datasets[1].data = reversed.map(() => 8.0);
         streamChart.data.datasets[2].data = reversed.map(() => 2.0);
+        updateStreamChartScale();
         streamChart.update();
         showToast("Telemetry stream chart synchronized", "info");
+    }
+}
+
+function telemetryTimeLabel(row) {
+    const timestamp = row.created_at_raw || row.raw?.created_at;
+    const date = timestamp ? new Date(timestamp) : new Date(row.created_at);
+    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function updateStreamChartScale() {
+    if (!streamChart) return;
+    const values = streamChart.data.datasets[0].data.map(Number).filter(Number.isFinite);
+    const minValue = Math.min(2, ...values);
+    const maxValue = Math.max(8, ...values);
+    const span = Math.max(maxValue - minValue, 6);
+    const margin = Math.max(1, span * 0.12);
+    const min = Math.floor((minValue - margin) / 2) * 2;
+    const max = Math.ceil((maxValue + margin) / 2) * 2;
+    streamChart.options.scales.y.min = min;
+    streamChart.options.scales.y.max = max;
+}
+
+function rememberTelemetryId(id) {
+    if (id !== undefined && id !== null) knownTelemetryIds.add(String(id));
+}
+
+function notifyTelemetryExcursion(row) {
+    if (!Number.isFinite(row.temperature)) return;
+    const key = String(row.device_id ?? row.device_token ?? "unknown");
+    const outside = row.temperature < 2 || row.temperature > 8;
+    if (outside && !activeExcursionDevices.has(key)) {
+        activeExcursionDevices.add(key);
+        const direction = row.temperature < 2 ? "thấp hơn 2°C" : "cao hơn 8°C";
+        if (typeof showToast === "function") {
+            showToast(`Cảnh báo nhiệt độ ${row.temperature}°C (${direction}) · ${row.device_token}`, "error");
+        }
+    } else if (!outside) {
+        activeExcursionDevices.delete(key);
+    }
+}
+
+function startTelemetryPolling() {
+    if (telemetryPollTimer) window.clearInterval(telemetryPollTimer);
+    telemetryPollTimer = window.setInterval(pollTelemetryFromDatabase, 3000);
+}
+
+async function pollTelemetryFromDatabase() {
+    if (telemetryPollRunning || !isStreamingActive) return;
+    telemetryPollRunning = true;
+    try {
+        const response = await api.get("/data", { limit: 100 });
+        const rows = response.success && Array.isArray(response.data?.list) ? response.data.list : null;
+        if (!rows) return;
+        if (!telemetryPollingSeeded) {
+            rows.forEach((row) => rememberTelemetryId(row.id));
+            telemetryPollingSeeded = true;
+            return;
+        }
+        const freshRows = rows.filter((row) => row.id !== undefined && row.id !== null && !knownTelemetryIds.has(String(row.id)));
+        freshRows.reverse().forEach((raw) => {
+            const row = formatRawPacket(raw);
+            rememberTelemetryId(row.id);
+            allTelemetry.unshift(row);
+            if (allTelemetry.length > 200) allTelemetry.pop();
+            pushToChart(row);
+            notifyTelemetryExcursion(row);
+        });
+        if (freshRows.length) {
+            filteredTelemetry = [...allTelemetry];
+            applyTelemetryFilters();
+            updateTopStats(allTelemetry);
+            if (pieChart) {
+                const safeCount = allTelemetry.filter((row) => row.temperature !== null && row.temperature >= 2 && row.temperature <= 8).length;
+                const lowCount = allTelemetry.filter((row) => row.temperature !== null && row.temperature < 2).length;
+                const highCount = allTelemetry.filter((row) => row.temperature !== null && row.temperature > 8).length;
+                pieChart.data.datasets[0].data = [lowCount, safeCount, highCount];
+                pieChart.update();
+            }
+            const lastSyncEl = document.getElementById("header-last-sync");
+            if (lastSyncEl) lastSyncEl.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+        }
+    } catch (error) {
+        console.warn("Could not poll telemetry from database:", error);
+    } finally {
+        telemetryPollRunning = false;
     }
 }

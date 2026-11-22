@@ -7,6 +7,9 @@
  */
 
 let audioAlertEnabled = true;
+const knownNotificationAlertIds = new Set();
+let notificationAlertsSeeded = false;
+const alertToastTimesByDevice = new Map();
 
 document.addEventListener("DOMContentLoaded", () => {
     // Only run on protected pages (not on login page)
@@ -343,7 +346,7 @@ function initNotificationsDrawer() {
     `;
     wrapper.appendChild(menu);
     loadNotificationAlerts();
-    window.setInterval(loadNotificationAlerts, 15000);
+    window.setInterval(loadNotificationAlerts, 4000);
 
     notifBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -467,6 +470,25 @@ async function loadNotificationAlerts() {
     try {
         const response = await api.get("/alerts");
         alerts = Array.isArray(response.data) ? response.data : (Array.isArray(response.data?.list) ? response.data.list : []);
+        const identifiedAlerts = alerts.filter((alert) => alert.id !== undefined && alert.id !== null);
+        if (!notificationAlertsSeeded) {
+            identifiedAlerts.forEach((alert) => knownNotificationAlertIds.add(String(alert.id)));
+            notificationAlertsSeeded = true;
+        } else {
+            const newAlerts = identifiedAlerts.filter((alert) => !knownNotificationAlertIds.has(String(alert.id)));
+            newAlerts.forEach((alert) => knownNotificationAlertIds.add(String(alert.id)));
+            if (newAlerts.length && typeof showToast === "function") {
+                const newest = newAlerts[0];
+                const pageHasLocalTelemetryAlert = /\/(data|devices-detail)\.html$/.test(window.location.pathname);
+                const deviceKey = String(newest.device_id || newest.device_token || "system");
+                const now = Date.now();
+                const lastToastAt = alertToastTimesByDevice.get(deviceKey) || 0;
+                if (!pageHasLocalTelemetryAlert && now - lastToastAt >= 30000) {
+                    alertToastTimesByDevice.set(deviceKey, now);
+                    showToast(`Cảnh báo nhiệt độ mới · ${newest.alert_content || newest.alert_type || "Nhiệt độ vượt ngưỡng 2–8°C"}`, "error");
+                }
+            }
+        }
     } catch (error) { /* Batch notifications should still load if alerts are unavailable. */ }
     try { await syncNewBatchNotifications(); } catch (error) { /* Keep the drawer usable if batch access is unavailable. */ }
 

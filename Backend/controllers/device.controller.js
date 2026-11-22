@@ -100,13 +100,17 @@ exports.getDeviceById = async (req, res) => {
 
         const device = deviceRes.rows[0];
 
-        // Lấy 30 bản ghi telemetry gần nhất
+        // Chọn 30 bản ghi mới nhất, rồi sắp xếp tăng dần để biểu đồ chạy trái sang phải.
         const historyRes = await pool.query(`
             SELECT id, temperature, humidity, created_at
-            FROM data
-            WHERE device_id = $1
-            ORDER BY created_at ASC
-            LIMIT 30
+            FROM (
+                SELECT id, temperature, humidity, created_at
+                FROM data
+                WHERE device_id = $1
+                ORDER BY created_at DESC, id DESC
+                LIMIT 30
+            ) recent_readings
+            ORDER BY created_at ASC, id ASC
         `, [id]);
 
         return res.json({
