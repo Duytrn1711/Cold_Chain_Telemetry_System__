@@ -174,7 +174,7 @@ $env:ARDUINO_DEVICE_TOKEN = "ARDUINO-ESP32-USB-01"
 .\Backend\scripts\arduino-serial-bridge.ps1 -PortName COM5 -BaudRate 9600
 ```
 
-Thay `COM5` và `9600` bằng cổng COM/baud rate thật của board. Nếu `ARDUINO_DEVICE_TOKEN` đã được đặt trên Render, có thể bỏ dòng gán token device ở máy bridge. Khi nhận gói đầu tiên, Cold Chain đăng ký device tự động và bắt đầu ghi telemetry.
+Thay `COM5` và `9600` bằng cổng COM/baud rate thật của board. Bridge mặc định trừ `20°C` khỏi nhiệt độ Arduino trước khi gửi; truyền `-TemperatureOffset 0` nếu không muốn hiệu chỉnh. Terminal hiển thị cả số gốc và số đã hiệu chỉnh. Nếu `ARDUINO_DEVICE_TOKEN` đã được đặt trên Render, có thể bỏ dòng gán token device ở máy bridge. Khi nhận gói đầu tiên, Cold Chain đăng ký device tự động và bắt đầu ghi telemetry.
 
 ## Các trang giao diện
 

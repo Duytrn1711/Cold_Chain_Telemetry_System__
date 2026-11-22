@@ -6,6 +6,8 @@ param(
     [ValidateRange(300, 2000000)]
     [int]$BaudRate = 9600,
 
+    [double]$TemperatureOffset = -20,
+
     [string]$ApiUrl = 'https://cold-chain-telemetry-system-1.onrender.com/api/integrations/arduino/telemetry',
 
     [string]$DeviceToken = $env:ARDUINO_DEVICE_TOKEN
@@ -49,7 +51,9 @@ try {
             if (-not $temperatureProperty) { $temperatureProperty = $packet.PSObject.Properties['temp'] }
             if (-not $temperatureProperty) { throw 'Missing temperature.' }
 
-            $temperature = [double]$temperatureProperty.Value
+            $rawTemperature = [double]$temperatureProperty.Value
+            $temperature = [Math]::Round($rawTemperature + $TemperatureOffset, 2)
+            if ($temperature -lt -100 -or $temperature -gt 100) { throw 'Corrected temperature is outside the accepted -100..100°C range.' }
             $humidityProperty = $packet.PSObject.Properties['humidity']
             $humidity = if ($humidityProperty -and $null -ne $humidityProperty.Value) { [double]$humidityProperty.Value } else { 0 }
             $body = @{ temperature = $temperature; humidity = $humidity }
@@ -58,7 +62,7 @@ try {
             $response = Invoke-RestMethod -Uri $ApiUrl -Method Post -Headers @{ 'x-arduino-token' = $apiToken } `
                 -ContentType 'application/json' -Body ($body | ConvertTo-Json -Compress) -TimeoutSec 10
             if (-not $response.success) { throw 'Cold Chain did not accept the telemetry packet.' }
-            Write-Host ("Stored telemetry: {0} °C, {1}% RH" -f $temperature, $humidity)
+            Write-Host ("Stored telemetry: {0} °C (raw {1} °C, offset {2} °C), {3}% RH" -f $temperature, $rawTemperature, $TemperatureOffset, $humidity)
         } catch {
             Write-Warning 'Skipped one serial line or failed to submit one packet. Check the Arduino JSON output and Cold Chain API settings.'
         }
