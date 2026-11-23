@@ -6,6 +6,7 @@
 let allVehicles = [];
 let selectedVehicleId = null;
 let vehicleProfileChart = null;
+let vehicleSelectionRequestId = 0;
 const movingBatchStatuses = new Set(["PICKUP_ASSIGNED", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"]);
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -136,6 +137,7 @@ function renderVehicleNodes(list) {
 }
 
 async function selectVehicle(id) {
+    const requestId = ++vehicleSelectionRequestId;
     selectedVehicleId = id;
     const veh = allVehicles.find(v => v.id == id);
     if (!veh) return;
@@ -156,9 +158,11 @@ async function selectVehicle(id) {
         // Fetch real database vehicle detail & telemetry history
         const res = await api.get(`/vehicles/${id}`);
         if (!res.success || !res.data) {
+            if (requestId !== vehicleSelectionRequestId) return;
             showToast("Failed to load vehicle telemetry", "error");
             return;
         }
+        if (requestId !== vehicleSelectionRequestId || selectedVehicleId != id) return;
 
         const detail = res.data;
         const device = detail.device;
@@ -280,9 +284,10 @@ async function selectVehicle(id) {
         if (originTitle) originTitle.textContent = shipment ? `From: ${routeOrigin || "Farmer pickup point"}` : "No active shipment";
         if (originSub) {
             const stage = shipment?.logistics_status;
-            const originContext = ["PICKUP_ASSIGNED", "PICKED_UP", "AT_INSPECTION"].includes(stage)
-                ? `Farmer: ${shipment.pickup_address || "—"}`
-                : `Receiving warehouse: ${shipment.receiving_warehouse_name || routeOrigin || "—"}`;
+            const originContext = !shipment ? ""
+                : ["PICKUP_ASSIGNED", "PICKED_UP", "AT_INSPECTION"].includes(stage)
+                    ? `Farmer: ${shipment.pickup_address || "—"}`
+                    : `Receiving warehouse: ${shipment.receiving_warehouse_name || routeOrigin || "—"}`;
             originSub.textContent = shipment ? `${originContext} · ${shipment.product_name || "Produce"}` : "Route will appear when an Agri batch is assigned.";
         }
         if (destTitle) destTitle.textContent = shipment ? `To: ${routeDestination || "Destination pending"}` : "Destination not assigned";
@@ -340,6 +345,7 @@ async function selectVehicle(id) {
         renderPingHistoryTable(isMovingShipment && device?.is_online ? cargoPings : [], device);
 
     } catch (err) {
+        if (requestId !== vehicleSelectionRequestId || selectedVehicleId != id) return;
         console.error("Error in selectVehicle:", err);
         showToast("Error retrieving vehicle telemetry: " + err.message, "error");
     }
