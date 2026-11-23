@@ -23,41 +23,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await loadDeviceDetails(devId);
     detailRefreshTimer = window.setInterval(refreshDeviceTelemetry, 3000);
-
-    // Live telemetry update listener
-    window.onTelemetryLiveUpdate = (packet) => {
-        if (packet.device_id == devId) {
-            console.log("Live packet for this device:", packet);
-            if (!packet.persisted) return;
-            if (packet.id !== undefined && knownDeviceReadingIds.has(String(packet.id))) return;
-            const tempVal = parseFloat(packet.temperature);
-            const humidity = packet.humidity === null || packet.humidity === undefined ? "—" : `${Number(packet.humidity).toFixed(0)}%`;
-            document.getElementById("detail-temp-val").textContent = `${tempVal.toFixed(1)}°C`;
-            document.getElementById("detail-hum-val").textContent = humidity;
-
-            const rawTbody = document.getElementById("detail-raw-tbody");
-            if (rawTbody) {
-                const isSafe = tempVal >= 2.0 && tempVal <= 8.0;
-                const newRow = `
-                    <tr style="background: rgba(37, 99, 235, 0.05); animation: pulse 1s;">
-                        <td>#${packet.id} <span style="color:#2563eb; font-size:10px; font-weight:700;">LIVE</span></td>
-                        <td><strong class="temp-display ${isSafe ? 'temp-safe' : 'temp-danger'}">${tempVal.toFixed(1)}°C</strong></td>
-                        <td>${humidity}</td>
-                        <td>${new Date().toLocaleTimeString("en-US", { hour12: false })}</td>
-                        <td><span class="badge ${isSafe ? 'badge-active' : 'badge-critical'}">${isSafe ? 'SAFE' : 'EXCURSION'}</span></td>
-                    </tr>
-                `;
-                rawTbody.insertAdjacentHTML("afterbegin", newRow);
-            }
-            rememberDeviceReading(packet.id);
-            if (currentDeviceData) {
-                const latest = { ...packet, created_at: packet.created_at || new Date().toISOString() };
-                currentDeviceData.history = [...(currentDeviceData.history || []), latest].slice(-30);
-                renderDetailChart(currentDeviceData.history);
-            }
-            notifyDeviceTemperature(tempVal);
-        }
-    };
 });
 
 async function loadDeviceDetails(devId) {
@@ -68,14 +33,17 @@ async function loadDeviceDetails(devId) {
             currentDeviceData = dev;
 
             document.getElementById("detail-dev-token").textContent = `${dev.device_token} (DEV-00${dev.id})`;
-            document.getElementById("detail-badge-status").textContent = dev.status;
+            setDeviceConnectionBadge(dev.is_online === true);
 
             const assignment = dev.warehouse_name ? `Assigned to Warehouse: ${dev.warehouse_name}` : (dev.license_plate ? `Installed on Reefer Vehicle: ${dev.license_plate}` : "Standby Sensor");
             document.getElementById("detail-dev-assignment").textContent = assignment;
 
-            if (dev.latestReading) {
+            if (dev.latestReading && dev.is_online) {
                 document.getElementById("detail-temp-val").textContent = `${parseFloat(dev.latestReading.temperature).toFixed(1)}°C`;
                 document.getElementById("detail-hum-val").textContent = dev.latestReading.humidity === null ? "—" : `${Number(dev.latestReading.humidity).toFixed(0)}%`;
+            } else {
+                document.getElementById("detail-temp-val").textContent = "No live data";
+                document.getElementById("detail-hum-val").textContent = "—";
             }
 
             const rawTbody = document.getElementById("detail-raw-tbody");
@@ -125,20 +93,23 @@ async function refreshDeviceTelemetry() {
             deviceHistorySeeded = true;
             return;
         }
+        currentDeviceData = device;
+        setDeviceConnectionBadge(device.is_online === true);
+        const latest = device.latestReading || history[0];
+        if (latest && device.is_online) {
+            const temperature = Number(latest.temperature);
+            document.getElementById("detail-temp-val").textContent = `${temperature.toFixed(1)}°C`;
+            document.getElementById("detail-hum-val").textContent = latest.humidity === null || latest.humidity === undefined ? "—" : `${Number(latest.humidity).toFixed(0)}%`;
+        } else {
+            document.getElementById("detail-temp-val").textContent = "No live data";
+            document.getElementById("detail-hum-val").textContent = "—";
+        }
         if (!fresh.length) return;
 
         fresh.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).forEach((reading) => {
             rememberDeviceReading(reading.id);
-            notifyDeviceTemperature(Number(reading.temperature));
+            if (device.is_online) notifyDeviceTemperature(Number(reading.temperature));
         });
-
-        currentDeviceData = device;
-        const latest = device.latestReading || history[0];
-        if (latest) {
-            const temperature = Number(latest.temperature);
-            document.getElementById("detail-temp-val").textContent = `${temperature.toFixed(1)}°C`;
-            document.getElementById("detail-hum-val").textContent = latest.humidity === null || latest.humidity === undefined ? "—" : `${Number(latest.humidity).toFixed(0)}%`;
-        }
         const rawTbody = document.getElementById("detail-raw-tbody");
         if (rawTbody) {
             rawTbody.innerHTML = [...history].reverse().map(renderDeviceReadingRow).join("");
@@ -153,6 +124,14 @@ async function refreshDeviceTelemetry() {
 
 function rememberDeviceReading(id) {
     if (id !== undefined && id !== null) knownDeviceReadingIds.add(String(id));
+}
+
+function setDeviceConnectionBadge(isOnline) {
+    const badge = document.getElementById("detail-badge-status");
+    if (!badge) return;
+    badge.textContent = isOnline ? "ONLINE" : "OFFLINE";
+    badge.classList.remove("badge-active", "badge-online", "badge-critical", "badge-neutral");
+    badge.classList.add(isOnline ? "badge-active" : "badge-neutral");
 }
 
 function renderDeviceReadingRow(reading) {

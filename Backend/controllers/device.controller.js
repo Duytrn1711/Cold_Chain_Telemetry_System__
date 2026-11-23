@@ -1,4 +1,23 @@
 const pool = require("../db");
+const LIVE_DEVICE_WINDOW_MS = 90 * 1000;
+
+function addLiveConnectionState(rows) {
+    const arduinoToken = String(process.env.ARDUINO_DEVICE_TOKEN || "").trim();
+    const now = Date.now();
+    return rows.map((device) => {
+        const lastReadingTime = device.last_reading_time ? new Date(device.last_reading_time).getTime() : NaN;
+        const hasRecentArduinoReading = Boolean(
+            arduinoToken && device.device_token === arduinoToken &&
+            Number.isFinite(lastReadingTime) && now - lastReadingTime >= 0 && now - lastReadingTime <= LIVE_DEVICE_WINDOW_MS
+        );
+        const isOnline = device.status === "ACTIVE" && hasRecentArduinoReading;
+        return {
+            ...device,
+            is_online: isOnline,
+            connection_status: isOnline ? "ONLINE" : "OFFLINE"
+        };
+    });
+}
 
 // GET /api/devices - Lấy danh sách thiết bị cảm biến IoT
 exports.getAllDevices = async (req, res) => {
@@ -56,7 +75,7 @@ exports.getAllDevices = async (req, res) => {
 
         return res.json({
             success: true,
-            data: result.rows,
+            data: addLiveConnectionState(result.rows),
             message: "Lấy danh sách thiết bị IoT thành công"
         });
     } catch (error) {
@@ -113,12 +132,14 @@ exports.getDeviceById = async (req, res) => {
             ORDER BY created_at ASC, id ASC
         `, [id]);
 
+        const lastReading = historyRes.rows.length > 0 ? historyRes.rows[historyRes.rows.length - 1] : null;
+        const [deviceWithLiveState] = addLiveConnectionState([{ ...device, last_reading_time: lastReading?.created_at || null }]);
         return res.json({
             success: true,
             data: {
-                ...device,
+                ...deviceWithLiveState,
                 history: historyRes.rows,
-                latestReading: historyRes.rows.length > 0 ? historyRes.rows[historyRes.rows.length - 1] : null
+                latestReading: lastReading
             },
             message: "Lấy thông tin thiết bị thành công"
         });

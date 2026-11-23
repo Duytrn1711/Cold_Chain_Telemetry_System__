@@ -4,6 +4,8 @@
 
 let allDevices = [];
 let devTelemetryChart = null;
+let deviceFiltersReady = false;
+let deviceRefreshRunning = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
     await loadDevices();
@@ -12,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initRegisterModal();
     initTabs();
     renderDeviceDetailChart();
+    window.setInterval(() => loadDevices(true), 5000);
 });
 
 async function populateDeviceAssignments() {
@@ -28,9 +31,10 @@ async function populateDeviceAssignments() {
     }
 }
 
-async function loadDevices() {
+async function loadDevices(silent = false) {
     const tbody = document.getElementById("devices-tbody");
-    if (!tbody) return;
+    if (!tbody || deviceRefreshRunning) return;
+    deviceRefreshRunning = true;
 
     try {
         const res = await api.get("/devices");
@@ -40,17 +44,34 @@ async function loadDevices() {
             const active = document.getElementById("device-active-count");
             const excursions = document.getElementById("device-excursion-count");
             if (total) total.textContent = String(allDevices.length);
-            if (active) active.textContent = String(allDevices.filter(item => item.status === "ACTIVE").length);
-            if (excursions) excursions.textContent = String(allDevices.filter(item => item.temperature != null && (Number(item.temperature) < 2 || Number(item.temperature) > 8)).length);
+            const onlineDevices = allDevices.filter((item) => item.is_online === true);
+            const excursionDevices = onlineDevices.filter((item) => item.temperature != null && (Number(item.temperature) < 2 || Number(item.temperature) > 8));
+            if (active) active.textContent = String(onlineDevices.length);
+            if (excursions) excursions.textContent = String(excursionDevices.length);
+            const countByFilter = {
+                ALL: allDevices.length,
+                ONLINE: onlineDevices.length,
+                WARNING: excursionDevices.length,
+                OFFLINE: allDevices.length - onlineDevices.length
+            };
+            document.querySelectorAll(".filter-pills-row .pill-btn[data-filter]").forEach((button) => {
+                const key = button.dataset.filter;
+                const label = button.dataset.label || button.textContent.replace(/\s*\(.*\)$/, "").replace(/[●•]/g, "").trim();
+                button.dataset.label = label;
+                button.textContent = `${label} (${countByFilter[key] ?? 0})`;
+            });
             const countTag = document.getElementById("device-count-tag");
             const pagination = document.getElementById("device-pagination-info");
             if (countTag) countTag.textContent = `(${allDevices.length} database records)`;
             if (pagination) pagination.textContent = `Showing ${allDevices.length} of ${allDevices.length} registered devices`;
-            renderDevicesTable(allDevices);
+            if (deviceFiltersReady) applyDeviceFilters();
+            else renderDevicesTable(allDevices);
         }
     } catch (error) {
         console.error("Error loading devices:", error);
-        showToast("Unable to load devices list", "error");
+        if (!silent) showToast("Unable to load devices list", "error");
+    } finally {
+        deviceRefreshRunning = false;
     }
 }
 
@@ -62,13 +83,15 @@ function renderDevicesTable(list) {
         return;
     }
     tbody.innerHTML = list.map((device) => {
-        const temperature = device.temperature === null || device.temperature === undefined ? null : Number(device.temperature);
+        const isOnline = device.is_online === true;
+        const temperature = isOnline && device.temperature !== null && device.temperature !== undefined ? Number(device.temperature) : null;
         const excursion = temperature !== null && (temperature < 2 || temperature > 8);
         const entity = device.warehouse_name || device.license_plate || "Unassigned";
         const kind = device.warehouse_name ? "Warehouse" : (device.license_plate ? "Delivery vehicle" : "Unassigned");
-        const temperatureText = temperature === null ? "No reading" : `${temperature.toFixed(1)}°C`;
-        const state = String(device.status || "UNKNOWN").toUpperCase();
-        const stateClass = state === "ACTIVE" ? (excursion ? "badge-warning" : "badge-online") : "badge-neutral";
+        const temperatureText = temperature === null ? "No live data" : `${temperature.toFixed(1)}°C`;
+        const registeredActive = String(device.status || "").toUpperCase() === "ACTIVE";
+        const state = isOnline ? "ONLINE" : (registeredActive ? "OFFLINE" : "INACTIVE");
+        const stateClass = isOnline ? (excursion ? "badge-warning" : "badge-online") : "badge-neutral";
         return `<tr>
             <td><strong class="cell-code">${device.id}</strong></td>
             <td class="cell-code">${device.device_token}</td>
@@ -76,7 +99,7 @@ function renderDevicesTable(list) {
             <td><span class="badge badge-neutral">${kind}</span></td>
             <td style="color:#64748b">Not collected</td>
             <td style="color:#64748b">Not collected</td>
-            <td><span class="temp-display ${excursion ? "temp-danger" : "temp-safe"}">${temperatureText}</span></td>
+            <td><span class="temp-display ${excursion ? "temp-danger" : (isOnline ? "temp-safe" : "")}">${temperatureText}</span></td>
             <td><span class="badge ${stateClass}">${state}</span></td>
             <td><div style="display:flex;gap:6px;">
                 <button type="button" class="btn-table-action" onclick="window.location.href='devices-detail.html?id=${device.id}'">Details</button>
@@ -108,23 +131,8 @@ function initDeviceFilters() {
     const pills = document.querySelectorAll(".filter-pills-row .pill-btn");
     const assignSelect = document.getElementById("dev-assign-filter");
 
-    function filter() {
-        const query = (searchInput ? searchInput.value : "").trim().toLowerCase();
-        let filtered = allDevices.filter(d => {
-            return !query || d.device_token.toLowerCase().includes(query) || (d.warehouse_name && d.warehouse_name.toLowerCase().includes(query));
-        });
-
-        const activePill = document.querySelector(".filter-pills-row .pill-btn.active");
-        const pillVal = activePill ? activePill.getAttribute("data-filter") : "ALL";
-
-        if (pillVal === "WARNING") {
-            filtered = filtered.filter(d => d.id == 4 || (d.temperature && d.temperature > 8.0));
-        } else if (pillVal === "ONLINE") {
-            filtered = filtered.filter(d => d.status === "ACTIVE");
-        }
-
-        renderDevicesTable(filtered);
-    }
+    const filter = applyDeviceFilters;
+    deviceFiltersReady = true;
 
     if (searchInput) searchInput.addEventListener("input", filter);
     pills.forEach(p => {
@@ -135,6 +143,25 @@ function initDeviceFilters() {
         });
     });
     if (assignSelect) assignSelect.addEventListener("change", filter);
+}
+
+function applyDeviceFilters() {
+    const query = (document.getElementById("dev-search-input")?.value || "").trim().toLowerCase();
+    const assignSelect = document.getElementById("dev-assign-filter");
+    const assignment = assignSelect?.value || "ALL";
+    const activePill = document.querySelector(".filter-pills-row .pill-btn.active");
+    const pillValue = activePill?.dataset.filter || "ALL";
+    let filtered = allDevices.filter((device) => {
+        const matchesSearch = !query || String(device.device_token || "").toLowerCase().includes(query) ||
+            String(device.warehouse_name || "").toLowerCase().includes(query) || String(device.license_plate || "").toLowerCase().includes(query);
+        const matchesAssignment = assignment === "ALL" || (assignment === "WAREHOUSE" && Boolean(device.warehouse_id)) || (assignment === "VEHICLE" && Boolean(device.vehicle_id));
+        const matchesPill = pillValue === "ALL" ||
+            (pillValue === "ONLINE" && device.is_online === true) ||
+            (pillValue === "OFFLINE" && device.is_online !== true) ||
+            (pillValue === "WARNING" && device.is_online === true && device.temperature != null && (Number(device.temperature) < 2 || Number(device.temperature) > 8));
+        return matchesSearch && matchesAssignment && matchesPill;
+    });
+    renderDevicesTable(filtered);
 }
 
 function initRegisterModal() {

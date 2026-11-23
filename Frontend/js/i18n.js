@@ -212,7 +212,16 @@
         ["Chưa có tài khoản?", "Don't have an account?"], ["Đã có tài khoản?", "Already have an account?"], ["Quay lại đăng nhập", "Back to sign in"],
         ["Quyền truy cập được cấp sau khi admin phê duyệt", "Access is granted after administrator approval"],
         ["Lô hàng mới từ Agri-Audit", "New batch from Agri-Audit"], ["Chưa có lô hàng nào được Agri gửi sang Cold Chain.", "No batches have been received from Agri by Cold Chain."],
-        ["Theo dõi lấy hàng, chuyển đến kiểm định và giao hoặc hoàn trả theo kết quả.", "Track pickup, inspection transfer, and delivery or return based on the result."]
+        ["Theo dõi lấy hàng, chuyển đến kiểm định và giao hoặc hoàn trả theo kết quả.", "Track pickup, inspection transfer, and delivery or return based on the result."],
+        ["ONLINE", "TRỰC TUYẾN"], ["OFFLINE", "NGOẠI TUYẾN"], ["INACTIVE", "ĐÃ TẮT"],
+        ["Online", "Trực tuyến"], ["Offline", "Ngoại tuyến"], ["No live data", "Chưa có dữ liệu trực tiếp"],
+        ["ONLINE & HEALTHY", "TRỰC TUYẾN & ỔN ĐỊNH"], ["Registered Telemetry Units", "Thiết bị giám sát đã đăng ký"],
+        ["A device is online only while its Arduino sends live readings.", "Thiết bị chỉ được tính là trực tuyến khi Arduino đang gửi số đo thực."],
+        ["All", "Tất cả"], ["Warehouse", "Kho lạnh"], ["Delivery vehicle", "Xe vận chuyển"], ["Unassigned", "Chưa phân công"],
+        ["Not collected", "Chưa thu thập"], ["No registered devices match this filter.", "Không có thiết bị phù hợp với bộ lọc này."],
+        ["database records", "bản ghi trong cơ sở dữ liệu"], ["registered devices", "thiết bị đã đăng ký"],
+        ["Select a device from the device list.", "Chọn một thiết bị trong danh sách."], ["No reading", "Chưa có số đo"],
+        ["A device is online only while its Arduino sends live readings.", "Thiết bị chỉ được tính là trực tuyến khi Arduino đang gửi số đo thực."]
     ];
 
     const sortedPhrases = [...phrases].sort((a, b) => Math.max(b[0].length, b[1].length) - Math.max(a[0].length, a[1].length));
