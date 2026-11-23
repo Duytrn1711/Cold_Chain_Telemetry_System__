@@ -14,31 +14,55 @@ exports.getAllVehicles = async (req, res) => {
                 v.status,
                 v.created_at,
                 w.warehouse_name,
-                d.id AS device_id,
-                d.device_token,
-                d.status AS device_status,
-                dt.temperature,
-                dt.humidity,
-                dt.created_at AS last_ping_time,
+                sensor.device_id,
+                sensor.device_token,
+                sensor.device_status,
+                sensor.temperature,
+                sensor.humidity,
+                sensor.last_ping_time,
                 shipment.external_batch_code AS active_batch_code,
+                shipment.product_name AS shipment_product_name,
+                shipment.quantity AS shipment_quantity,
+                shipment.unit AS shipment_unit,
                 shipment.logistics_status AS shipment_status,
                 shipment.inspection_decision,
                 shipment.pickup_address AS shipment_pickup_address,
-                CASE WHEN shipment.inspection_decision = 'REJECTED' THEN shipment.pickup_address ELSE shipment.consumption_address END AS shipment_destination
+                shipment.route_origin AS shipment_route_origin,
+                shipment.route_destination AS shipment_destination,
+                shipment.receiving_warehouse_name,
+                shipment.updated_at AS shipment_updated_at
             FROM delivery_vehicle v
             LEFT JOIN warehouse w ON v.warehouse_id = w.id
-            LEFT JOIN device d ON d.vehicle_id = v.id
-            LEFT JOIN (
-                SELECT DISTINCT ON (device_id) device_id, temperature, humidity, created_at
-                FROM data
-                ORDER BY device_id, created_at DESC
-            ) dt ON dt.device_id = d.id
+            LEFT JOIN LATERAL (
+                SELECT d.id AS device_id, d.device_token, d.status AS device_status,
+                    latest.temperature, latest.humidity, latest.created_at AS last_ping_time
+                FROM device d
+                LEFT JOIN LATERAL (
+                    SELECT temperature, humidity, created_at
+                    FROM data WHERE device_id = d.id
+                    ORDER BY created_at DESC, id DESC LIMIT 1
+                ) latest ON TRUE
+                WHERE d.vehicle_id = v.id
+                ORDER BY latest.created_at DESC NULLS LAST, d.id ASC
+                LIMIT 1
+            ) sensor ON TRUE
             LEFT JOIN LATERAL (
                 SELECT o.external_batch_code, o.logistics_status, o.inspection_decision,
-                    b.origin AS pickup_address, o.consumption_address
+                    b.origin AS pickup_address, o.consumption_address, b.product_name,
+                    b.quantity, b.unit, wh.warehouse_name AS receiving_warehouse_name, o.updated_at,
+                    CASE WHEN o.logistics_status IN ('OUT_FOR_DELIVERY','DELIVERY_READY') THEN wh.warehouse_name
+                         WHEN o.logistics_status IN ('OUT_FOR_RETURN','RETURN_READY') THEN COALESCE(wh.warehouse_name, b.origin)
+                         ELSE b.origin END AS route_origin,
+                    CASE WHEN o.logistics_status IN ('OUT_FOR_DELIVERY','DELIVERY_READY') THEN o.consumption_address
+                         WHEN o.logistics_status IN ('OUT_FOR_RETURN','RETURN_READY') THEN b.origin
+                         WHEN o.logistics_status IN ('PICKUP_ASSIGNED','PICKED_UP','AT_INSPECTION') THEN wh.warehouse_name
+                         ELSE o.consumption_address END AS route_destination
                 FROM cold_chain_batch_operations o
                 JOIN agri_batches b ON b.id = o.batch_id
-                WHERE o.vehicle_id = v.id AND o.logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
+                LEFT JOIN warehouse wh ON wh.id = o.warehouse_id
+                WHERE o.vehicle_id = v.id AND o.logistics_status IN (
+                    'PICKUP_ASSIGNED','PICKED_UP','AT_INSPECTION','DELIVERY_READY','RETURN_READY','OUT_FOR_DELIVERY','OUT_FOR_RETURN'
+                )
                 ORDER BY o.updated_at DESC LIMIT 1
             ) shipment ON TRUE
             WHERE 1=1
@@ -70,7 +94,9 @@ exports.getAllVehicles = async (req, res) => {
                 status: vehicle.device_status,
                 last_reading_time: vehicle.last_ping_time
             }]);
-            return { ...vehicle, device_is_online: deviceState.is_online };
+            const moving = ["PICKUP_ASSIGNED", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"].includes(vehicle.shipment_status);
+            const operationalStatus = moving ? "IN_TRANSIT" : (vehicle.status === "IDLE" ? "IDLE" : "ACTIVE");
+            return { ...vehicle, registered_status: vehicle.status, status: operationalStatus, device_is_online: deviceState.is_online, shipment_is_moving: moving };
         });
 
         return res.json({
@@ -119,11 +145,21 @@ exports.getVehicleById = async (req, res) => {
         const shipmentRes = await pool.query(`
             SELECT b.id, o.external_batch_code, b.product_name, b.producer_name, o.inspection_decision,
                 o.logistics_status, b.origin AS pickup_address,
-                CASE WHEN o.inspection_decision = 'REJECTED' THEN b.origin ELSE o.consumption_address END AS destination_address,
-                b.quantity, b.unit, o.updated_at
+                b.quantity, b.unit, o.updated_at, o.consumption_address,
+                wh.warehouse_name AS receiving_warehouse_name,
+                CASE WHEN o.logistics_status IN ('OUT_FOR_DELIVERY','DELIVERY_READY') THEN wh.warehouse_name
+                     WHEN o.logistics_status IN ('OUT_FOR_RETURN','RETURN_READY') THEN COALESCE(wh.warehouse_name,b.origin)
+                     ELSE b.origin END AS route_origin,
+                CASE WHEN o.logistics_status IN ('OUT_FOR_DELIVERY','DELIVERY_READY') THEN o.consumption_address
+                     WHEN o.logistics_status IN ('OUT_FOR_RETURN','RETURN_READY') THEN b.origin
+                     WHEN o.logistics_status IN ('PICKUP_ASSIGNED','PICKED_UP','AT_INSPECTION') THEN wh.warehouse_name
+                     ELSE o.consumption_address END AS route_destination
             FROM cold_chain_batch_operations o
             JOIN agri_batches b ON b.id = o.batch_id
-            WHERE o.vehicle_id = $1 AND o.logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
+            LEFT JOIN warehouse wh ON wh.id=o.warehouse_id
+            WHERE o.vehicle_id = $1 AND o.logistics_status IN (
+                'PICKUP_ASSIGNED','PICKED_UP','AT_INSPECTION','DELIVERY_READY','RETURN_READY','OUT_FOR_DELIVERY','OUT_FOR_RETURN'
+            )
             ORDER BY o.updated_at DESC LIMIT 1
         `, [id]);
 
@@ -143,19 +179,25 @@ exports.getVehicleById = async (req, res) => {
             ORDER BY d.id ASC
         `, [id]);
         const liveDevices = addLiveConnectionState(deviceRes.rows);
+        const currentShipment = shipmentRes.rows[0] || null;
+        const isMoving = Boolean(currentShipment && ["PICKUP_ASSIGNED", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"].includes(currentShipment.logistics_status));
+        const registeredStatus = vehicle.status;
+        vehicle.status = isMoving ? "IN_TRANSIT" : (registeredStatus === "IDLE" ? "IDLE" : "ACTIVE");
 
         let telemetryHistory = [];
         let latestReading = null;
+        let primaryDevice = null;
 
         if (deviceRes.rows.length > 0) {
+            primaryDevice = liveDevices.find((device) => device.is_online) || liveDevices[0];
             const historyRes = await pool.query(`
                 SELECT dt.id, dt.device_id, d.device_token, dt.temperature, dt.humidity, dt.created_at
                 FROM data dt
                 JOIN device d ON dt.device_id = d.id
-                WHERE d.vehicle_id = $1
+                WHERE d.vehicle_id = $1 AND d.id = $2
                 ORDER BY dt.created_at DESC
                 LIMIT 50
-            `, [id]);
+            `, [id, primaryDevice.id]);
             const rowsDesc = historyRes.rows;
             if (rowsDesc.length > 0) {
                 latestReading = rowsDesc[0];
@@ -168,12 +210,14 @@ exports.getVehicleById = async (req, res) => {
             success: true,
             data: {
                 ...vehicle,
-                device: liveDevices[0] || null,
+                device: primaryDevice,
                 devices: liveDevices,
                 latestReading,
                 telemetryHistory,
                 recentPings: telemetryHistory.slice().reverse(),
-                currentShipment: shipmentRes.rows[0] || null
+                currentShipment,
+                shipment_is_moving: isMoving,
+                registered_status: registeredStatus
             },
             message: "Lấy chi tiết xe tải thành công"
         });

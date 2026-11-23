@@ -9,7 +9,7 @@ exports.getSummary = async (req, res) => {
             pool.query(`SELECT COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE status = 'ACTIVE') AS active,
                 (SELECT COUNT(DISTINCT vehicle_id) FROM cold_chain_batch_operations
-                    WHERE vehicle_id IS NOT NULL AND logistics_status IN ('PICKUP_ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')) AS in_transit
+                    WHERE vehicle_id IS NOT NULL AND logistics_status IN ('PICKUP_ASSIGNED', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')) AS in_transit
                 FROM delivery_vehicle`),
             pool.query("SELECT COUNT(*) AS total, COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active FROM device"),
             pool.query(`SELECT COUNT(*) AS total,

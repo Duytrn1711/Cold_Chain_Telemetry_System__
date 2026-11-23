@@ -6,16 +6,20 @@
 let allVehicles = [];
 let selectedVehicleId = null;
 let vehicleProfileChart = null;
+const movingBatchStatuses = new Set(["PICKUP_ASSIGNED", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"]);
 
 document.addEventListener("DOMContentLoaded", async () => {
     await loadVehicles();
     initVehicleFilters();
+    window.setInterval(() => loadVehicles({ quiet: true }), 5000);
 });
 
-async function loadVehicles() {
+async function loadVehicles({ quiet = false } = {}) {
     try {
         const res = await api.get("/vehicles");
         if (res.success && res.data) {
+            const previous = allVehicles.find((vehicle) => vehicle.id == selectedVehicleId);
+            const previousRouteState = previous ? `${previous.active_batch_code || ""}:${previous.shipment_status || ""}:${previous.device_is_online}:${previous.temperature}:${previous.humidity}` : "";
             allVehicles = res.data;
             const countEl = document.getElementById("count-all-fleet");
             if (countEl) countEl.textContent = allVehicles.length;
@@ -27,19 +31,19 @@ async function loadVehicles() {
             // Select active or first vehicle by default
             if (allVehicles.length > 0) {
                 const target = selectedVehicleId ? (allVehicles.find(v => v.id == selectedVehicleId) || allVehicles[0]) : allVehicles[0];
-                await selectVehicle(target.id);
+                const routeState = `${target.active_batch_code || ""}:${target.shipment_status || ""}:${target.device_is_online}:${target.temperature}:${target.humidity}`;
+                if (!selectedVehicleId || routeState !== previousRouteState) await selectVehicle(target.id);
             }
         }
     } catch (error) {
         console.error("Error loading vehicles:", error);
-        showToast("Unable to load fleet vehicles list", "error");
+        if (!quiet) showToast("Unable to load fleet vehicles list", "error");
     }
 }
 
 function updateVehicleFilterCounts() {
-    const activeStatuses = new Set(["PICKED_UP", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"]);
-    const inTransit = allVehicles.filter((vehicle) => activeStatuses.has(vehicle.shipment_status)).length;
-    const warning = allVehicles.filter((vehicle) => vehicle.temperature !== null && vehicle.temperature !== undefined && (Number(vehicle.temperature) < 2 || Number(vehicle.temperature) > 8)).length;
+    const inTransit = allVehicles.filter((vehicle) => vehicle.shipment_is_moving === true).length;
+    const warning = allVehicles.filter((vehicle) => vehicle.shipment_is_moving && vehicle.device_is_online && vehicle.temperature !== null && vehicle.temperature !== undefined && (Number(vehicle.temperature) < 2 || Number(vehicle.temperature) > 8)).length;
     const counts = { ALL: allVehicles.length, TRANSIT: inTransit, IDLE: Math.max(0, allVehicles.length - inTransit), WARNING: warning };
     document.querySelectorAll(".filter-pills-row .pill-btn").forEach((button) => {
         const filter = button.getAttribute("data-filter");
@@ -56,7 +60,7 @@ function updateFleetComplianceGrade() {
         gradeEl.textContent = "--";
         return;
     }
-    const withTemp = allVehicles.filter(v => v.temperature !== null && v.temperature !== undefined);
+    const withTemp = allVehicles.filter(v => v.shipment_is_moving && v.device_is_online && v.temperature !== null && v.temperature !== undefined);
     if (withTemp.length === 0) {
         gradeEl.textContent = "—";
         return;
@@ -84,24 +88,37 @@ function renderVehicleNodes(list) {
 
     container.innerHTML = list.map((veh) => {
         const isSelected = veh.id == selectedVehicleId;
-        const temp = veh.device_is_online && veh.temperature !== null && veh.temperature !== undefined ? parseFloat(veh.temperature) : null;
+        const isMoving = veh.shipment_is_moving === true;
+        const temp = isMoving && veh.device_is_online && veh.temperature !== null && veh.temperature !== undefined ? parseFloat(veh.temperature) : null;
         const isExcursion = temp !== null && (temp > 8.0 || temp < 2.0);
         const badgeClass = temp === null ? "badge-offline" : (isExcursion ? "badge-critical" : "badge-online");
         const tempText = temp !== null 
             ? `${temp.toFixed(1)}°C ${isExcursion ? 'ALERT' : 'NORMAL'}`
-            : "NO SENSOR";
+            : (isMoving ? "NO LIVE CARGO SENSOR" : "NO ACTIVE LOAD");
         const subNote = isExcursion 
             ? (temp > 8.0 ? "High temp spike" : "Low freeze risk") 
-            : (temp !== null ? "Safe band · 2°C - 8°C" : "No device reading");
+            : (temp !== null ? "Safe band · 2°C - 8°C" : (isMoving ? "No live cargo telemetry" : "Vehicle is not transporting an Agri batch"));
         const depot = veh.warehouse_name || "No warehouse assigned";
-        const shipmentText = veh.active_batch_code ? `${veh.active_batch_code} · ${veh.shipment_destination || "Destination not set"}` : "No active Agri shipment";
+        const stateLabels = {
+            PICKUP_ASSIGNED: "Picking up from farmer",
+            PICKED_UP: "At receiving warehouse",
+            AT_INSPECTION: "At inspection",
+            DELIVERY_READY: "Waiting to depart for delivery",
+            RETURN_READY: "Waiting to depart for return",
+            OUT_FOR_DELIVERY: "Delivering to consumption point",
+            OUT_FOR_RETURN: "Returning to farmer"
+        };
+        const stateLabel = stateLabels[veh.shipment_status] || (veh.status === "IDLE" ? "Idle" : "Ready");
+        const shipmentText = veh.active_batch_code
+            ? `${veh.active_batch_code} · ${veh.shipment_product_name || "Produce"}${veh.shipment_quantity != null ? ` · ${veh.shipment_quantity} ${veh.shipment_unit || ""}` : ""} · ${veh.shipment_destination || "Destination not set"}`
+            : "No active Agri shipment";
 
         return `
             <div class="fleet-node-item ${isSelected ? 'active' : ''}" onclick="selectVehicle(${veh.id})">
                 <div class="node-top-row">
                     <div class="node-plate-group">
                         <span class="node-plate">${veh.license_plate}</span>
-                        <span class="badge badge-transit" style="font-size:10px;">${veh.status === 'ACTIVE' ? 'IN TRANSIT' : 'IDLE'}</span>
+                        <span class="badge ${isMoving ? "badge-transit" : "badge-neutral"}" style="font-size:10px;">${stateLabel}</span>
                     </div>
                     <span class="badge ${badgeClass}" style="font-size:11px;">
                         <span class="badge-dot"></span>
@@ -145,9 +162,16 @@ async function selectVehicle(id) {
 
         const detail = res.data;
         const device = detail.device;
-        const reading = detail.latestReading;
         const history = detail.telemetryHistory || [];
         const pings = detail.recentPings || history.slice().reverse();
+        const shipment = detail.currentShipment;
+        const isMovingShipment = Boolean(shipment && movingBatchStatuses.has(shipment.logistics_status));
+        const transportStartedAt = shipment?.updated_at ? new Date(shipment.updated_at).getTime() : null;
+        const cargoHistory = isMovingShipment && device?.is_online
+            ? history.filter((item) => transportStartedAt === null || new Date(item.created_at).getTime() >= transportStartedAt)
+            : [];
+        const cargoPings = cargoHistory.slice().reverse();
+        const reading = cargoHistory[cargoHistory.length - 1] || null;
 
         // Update Stat Tiles
         const tempTile = document.getElementById("v-stat-temp-tile");
@@ -159,7 +183,7 @@ async function selectVehicle(id) {
         const nodeSub = document.getElementById("v-stat-node-sub");
         const statusBadge = document.getElementById("v-detail-status-badge");
 
-        if (reading && reading.temperature !== null && device?.is_online) {
+        if (reading && reading.temperature !== null && device?.is_online && isMovingShipment) {
             const tempVal = parseFloat(reading.temperature);
             const humVal = reading.humidity !== null ? parseFloat(reading.humidity) : null;
             const isHigh = tempVal > 8.0;
@@ -218,7 +242,7 @@ async function selectVehicle(id) {
                     statusBadge.className = "badge badge-online";
                     statusBadge.style.background = "";
                     statusBadge.style.color = "";
-                    statusBadge.textContent = detail.status || "Active";
+                    statusBadge.textContent = "In transit · cargo temperature safe";
                 }
             }
         } else {
@@ -237,7 +261,7 @@ async function selectVehicle(id) {
             if (humStat) humStat.textContent = "--";
             if (statusBadge) {
                 statusBadge.className = "badge badge-offline";
-                statusBadge.textContent = "No Data";
+                statusBadge.textContent = isMovingShipment ? "In transit · no live cargo sensor" : "No active shipment in transit";
             }
         }
 
@@ -251,47 +275,69 @@ async function selectVehicle(id) {
         const destSub = document.getElementById("v-route-dest-sub");
         const routeCode = document.getElementById("v-route-code-tag");
 
-        const shipment = detail.currentShipment;
-        if (originTitle) originTitle.textContent = `Pickup: ${shipment?.pickup_address || "No active Agri batch assigned"}`;
-        if (originSub) originSub.textContent = shipment ? `Batch ${shipment.external_batch_code}` : "Shipment details will appear when a batch is assigned.";
-        if (destTitle) destTitle.textContent = `Destination: ${shipment?.destination_address || "No destination assigned"}`;
-        if (destSub) destSub.textContent = shipment ? `${shipment.logistics_status} · ${shipment.quantity} ${shipment.unit}` : "No active shipment.";
+        const routeOrigin = shipment?.route_origin || shipment?.pickup_address;
+        const routeDestination = shipment?.route_destination;
+        if (originTitle) originTitle.textContent = shipment ? `From: ${routeOrigin || "Farmer pickup point"}` : "No active shipment";
+        if (originSub) {
+            const stage = shipment?.logistics_status;
+            const originContext = ["PICKUP_ASSIGNED", "PICKED_UP", "AT_INSPECTION"].includes(stage)
+                ? `Farmer: ${shipment.pickup_address || "—"}`
+                : `Receiving warehouse: ${shipment.receiving_warehouse_name || routeOrigin || "—"}`;
+            originSub.textContent = shipment ? `${originContext} · ${shipment.product_name || "Produce"}` : "Route will appear when an Agri batch is assigned.";
+        }
+        if (destTitle) destTitle.textContent = shipment ? `To: ${routeDestination || "Destination pending"}` : "Destination not assigned";
+        if (destSub) destSub.textContent = shipment ? `${shipment.logistics_status} · ${shipment.quantity} ${shipment.unit}` : "No Agri shipment is assigned to this vehicle.";
         if (routeCode) routeCode.textContent = shipment ? shipment.external_batch_code : "No route";
+        const routeProgress = document.getElementById("v-route-progress-text");
+        const routeMode = document.getElementById("v-route-mode-tag");
+        if (routeProgress) {
+            routeProgress.textContent = !shipment ? "No active route" : isMovingShipment
+                ? (shipment.logistics_status === "PICKUP_ASSIGNED" ? "Vehicle is travelling from the farmer to the receiving warehouse" : shipment.logistics_status === "OUT_FOR_RETURN" ? "Vehicle is returning the rejected batch to the farmer" : "Vehicle is delivering the approved batch to the consumption point")
+                : shipment.logistics_status === "DELIVERY_READY" ? "Inspection approved · waiting for dispatch to the consumption point"
+                    : shipment.logistics_status === "RETURN_READY" ? "Inspection rejected · waiting for return dispatch"
+                        : shipment.logistics_status === "PICKED_UP" || shipment.logistics_status === "AT_INSPECTION" ? "Pickup route completed · batch is at the inspection warehouse"
+                            : "Shipment route is scheduled";
+        }
+        if (routeMode) routeMode.textContent = isMovingShipment ? "IN TRANSIT" : shipment ? "ROUTE PLANNED" : "NO ACTIVE ROUTE";
 
         // Update Chart Subtitle
         const chartTitle = document.getElementById("v-chart-title");
         const chartSubtitle = document.getElementById("v-chart-subtitle");
-        if (chartTitle) chartTitle.textContent = `Vehicle ${detail.license_plate} - Temperature Profile`;
+        if (chartTitle) chartTitle.textContent = isMovingShipment
+            ? `Vehicle ${detail.license_plate} - Cargo Temperature Profile`
+            : `Vehicle ${detail.license_plate} - Temperature Profile`;
 
-        if (history.length > 0) {
-            const temps = history.map(h => parseFloat(h.temperature));
+        if (cargoHistory.length > 0) {
+            const temps = cargoHistory.map(h => parseFloat(h.temperature));
             const minT = Math.min(...temps);
             const maxT = Math.max(...temps);
-            const breaches = history.filter(h => {
+            const breaches = cargoHistory.filter(h => {
                 const t = parseFloat(h.temperature);
                 return t < 2.0 || t > 8.0;
             });
 
             if (breaches.length > 0) {
                 if (chartSubtitle) {
-                    chartSubtitle.innerHTML = `<span style="color:#ef4444; font-weight:600;">⚠️ ${breaches.length} excursion point(s) detected!</span> Min: ${minT.toFixed(1)}°C · Max: ${maxT.toFixed(1)}°C (${history.length} database readings)`;
+                    chartSubtitle.innerHTML = `<span style="color:#ef4444; font-weight:600;">⚠️ ${breaches.length} excursion point(s) detected!</span> Min: ${minT.toFixed(1)}°C · Max: ${maxT.toFixed(1)}°C (${cargoHistory.length} live cargo readings)`;
                 }
             } else {
                 if (chartSubtitle) {
-                    chartSubtitle.innerHTML = `<span style="color:#10b981; font-weight:600;">✓ All readings compliant</span> Min: ${minT.toFixed(1)}°C · Max: ${maxT.toFixed(1)}°C (${history.length} database readings)`;
+                    chartSubtitle.innerHTML = `<span style="color:#10b981; font-weight:600;">✓ All readings compliant</span> Min: ${minT.toFixed(1)}°C · Max: ${maxT.toFixed(1)}°C (${cargoHistory.length} live cargo readings)`;
                 }
             }
         } else {
             if (chartSubtitle) {
-                chartSubtitle.textContent = "No telemetry points found in database for this vehicle.";
+                chartSubtitle.textContent = isMovingShipment
+                    ? (device?.is_online ? "No live readings have arrived for this transport yet." : "Cargo telemetry is unavailable: no live vehicle sensor is connected.")
+                    : "Cargo temperature is shown while this vehicle is transporting an Agri batch.";
             }
         }
 
         // Render Database Telemetry Chart
-        renderVehicleProfileChart(detail.license_plate, history);
+        renderVehicleProfileChart(detail.license_plate, cargoHistory);
 
         // Render Telemetry Ping History Table
-        renderPingHistoryTable(pings, device);
+        renderPingHistoryTable(isMovingShipment && device?.is_online ? cargoPings : [], device);
 
     } catch (err) {
         console.error("Error in selectVehicle:", err);
@@ -472,12 +518,12 @@ function initVehicleFilters() {
             if (filter === "ALL") {
                 renderVehicleNodes(allVehicles);
             } else if (filter === "TRANSIT") {
-                renderVehicleNodes(allVehicles.filter(v => ["PICKED_UP", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"].includes(v.shipment_status)));
+                renderVehicleNodes(allVehicles.filter(v => v.shipment_is_moving === true));
             } else if (filter === "IDLE") {
-                renderVehicleNodes(allVehicles.filter(v => !["PICKED_UP", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"].includes(v.shipment_status)));
+                renderVehicleNodes(allVehicles.filter(v => v.shipment_is_moving !== true));
             } else if (filter === "WARNING") {
                 renderVehicleNodes(allVehicles.filter(v => {
-                    if (v.temperature === null || v.temperature === undefined) return false;
+                    if (!v.shipment_is_moving || !v.device_is_online || v.temperature === null || v.temperature === undefined) return false;
                     const t = parseFloat(v.temperature);
                     return t < 2.0 || t > 8.0;
                 }));

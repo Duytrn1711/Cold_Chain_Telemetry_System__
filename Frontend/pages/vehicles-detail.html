@@ -87,7 +87,16 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-title">OPERATIONAL STATUS</div>
-                        <div class="stat-card-value" style="font-size:20px; color:#10b981;" id="v-state-text">IN TRANSIT</div>
+                        <div class="stat-card-value" style="font-size:20px; color:#10b981;" id="v-state-text">—</div>
+                    </div>
+                </div>
+
+                <div class="table-card" style="margin-top:20px; padding:20px;">
+                    <div class="table-card-title">Agri batch route</div>
+                    <div style="display:grid; grid-template-columns:1fr auto 1fr; gap:16px; align-items:center; margin-top:14px;">
+                        <div><strong id="v-route-origin">No active shipment</strong><div id="v-route-origin-note" style="color:#64748b; margin-top:5px;">Route appears when a batch is assigned.</div></div>
+                        <div aria-hidden="true" style="color:#2563eb; font-size:24px;">→</div>
+                        <div><strong id="v-route-destination">No destination assigned</strong><div id="v-route-status" style="color:#64748b; margin-top:5px;">NO ACTIVE ROUTE</div></div>
                     </div>
                 </div>
 
@@ -136,22 +145,34 @@
                 if (res.success && res.data) {
                     const v = res.data;
                     currentVehicleData = v;
+                    const shipment = v.currentShipment;
+                    const isMoving = v.shipment_is_moving === true;
                     document.getElementById("v-title-plate").textContent = `Vehicle ${v.license_plate}`;
                     document.getElementById("v-depot-desc").textContent = `Assigned warehouse: ${v.warehouse_name || "Not assigned"}`;
-                    document.getElementById("v-status-badge").textContent = v.status;
-                    document.getElementById("v-state-text").textContent = v.status;
+                    document.getElementById("v-status-badge").textContent = isMoving ? "IN TRANSIT" : v.status;
+                    document.getElementById("v-state-text").textContent = isMoving ? "IN TRANSIT" : v.status;
 
-                    if (v.latestReading) {
-                        document.getElementById("v-current-temp").textContent = `${parseFloat(v.latestReading.temperature).toFixed(1)}°C`;
-                        document.getElementById("v-current-hum").textContent = v.latestReading.humidity === null ? "—" : `${Number(v.latestReading.humidity).toFixed(0)}%`;
-                    }
+                    const transportStart = shipment?.updated_at ? new Date(shipment.updated_at).getTime() : null;
+                    const liveHistory = isMoving && v.device?.is_online
+                        ? (v.telemetryHistory || []).filter((reading) => transportStart === null || new Date(reading.created_at).getTime() >= transportStart)
+                        : [];
+                    const latestLive = liveHistory[liveHistory.length - 1];
+                    document.getElementById("v-current-temp").textContent = latestLive?.temperature != null ? `${Number(latestLive.temperature).toFixed(1)}°C` : "—";
+                    document.getElementById("v-current-hum").textContent = latestLive?.humidity != null ? `${Number(latestLive.humidity).toFixed(1)}%` : "—";
+                    document.getElementById("v-route-origin").textContent = shipment?.route_origin || shipment?.pickup_address || "No active shipment";
+                    document.getElementById("v-route-destination").textContent = shipment?.route_destination || "Destination not assigned";
+                    document.getElementById("v-route-status").textContent = isMoving ? `IN TRANSIT · ${shipment.logistics_status}` : (shipment?.logistics_status || "NO ACTIVE ROUTE");
+                    document.getElementById("v-route-origin-note").textContent = shipment
+                        ? `${shipment.external_batch_code} · ${shipment.product_name || "Produce"} · ${shipment.quantity} ${shipment.unit}`
+                        : "Route appears when a batch is assigned.";
+
                     if (v.device) {
                         document.getElementById("v-device-token").textContent = v.device.device_token;
                     }
 
                     const tbody = document.getElementById("v-detail-history-tbody");
-                    if (v.telemetryHistory && v.telemetryHistory.length > 0) {
-                        tbody.innerHTML = v.telemetryHistory.map(h => {
+                    if (liveHistory.length > 0) {
+                        tbody.innerHTML = liveHistory.map(h => {
                             const t = parseFloat(h.temperature);
                             const isSafe = t >= 2.0 && t <= 8.0;
                             return `
@@ -174,7 +195,8 @@
 
             // Live updates
             window.onTelemetryLiveUpdate = (packet) => {
-                if (packet.persisted && currentVehicleData && currentVehicleData.device && currentVehicleData.device.id == packet.device_id) {
+                if (packet.persisted && currentVehicleData && currentVehicleData.shipment_is_moving === true && currentVehicleData.device?.id == packet.device_id) {
+                    currentVehicleData.device.is_online = true;
                     const t = parseFloat(packet.temperature);
                     document.getElementById("v-current-temp").textContent = `${t.toFixed(1)}°C`;
                     document.getElementById("v-current-hum").textContent = packet.humidity === null ? "—" : `${Number(packet.humidity).toFixed(0)}%`;

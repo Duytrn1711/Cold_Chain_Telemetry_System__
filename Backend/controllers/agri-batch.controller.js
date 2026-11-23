@@ -208,7 +208,7 @@ async function transitionBatch(req, res) {
             }
             const occupied = await client.query(`SELECT batch_id FROM cold_chain_batch_operations
                 WHERE vehicle_id=$1 AND batch_id<>$2
-                AND logistics_status IN ('PICKUP_ASSIGNED','PICKED_UP','OUT_FOR_DELIVERY','OUT_FOR_RETURN')
+                AND logistics_status IN ('PICKUP_ASSIGNED','PICKED_UP','AT_INSPECTION','DELIVERY_READY','RETURN_READY','OUT_FOR_DELIVERY','OUT_FOR_RETURN')
                 LIMIT 1`, [vehicleId, batch.id]);
             if (occupied.rowCount) {
                 await client.query("ROLLBACK");
@@ -239,6 +239,12 @@ async function transitionBatch(req, res) {
             warehouse_id=COALESCE($3,warehouse_id), vehicle_id=COALESCE($4,vehicle_id),
             completed_at=CASE WHEN $5 IN ('DELIVERED','RETURNED') THEN CURRENT_TIMESTAMP ELSE completed_at END,
             updated_at=CURRENT_TIMESTAMP WHERE batch_id=$1`, [batch.id, nextStatus, req.body.warehouse_id ?? null, req.body.vehicle_id ?? null, nextStatus]);
+        const assignedVehicleId = nextStatus === "PICKUP_ASSIGNED" ? Number(req.body.vehicle_id) : batch.vehicle_id;
+        if (assignedVehicleId) {
+            const vehicleStatus = ["PICKUP_ASSIGNED", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"].includes(nextStatus)
+                ? "IN_TRANSIT" : "ACTIVE";
+            await client.query("UPDATE delivery_vehicle SET status=$2 WHERE id=$1", [assignedVehicleId, vehicleStatus]);
+        }
         const updated = await client.query(`SELECT ${BATCH_FIELDS} FROM ${BATCH_FROM} WHERE b.id=$1`, [batch.id]);
         await client.query("COMMIT");
         return res.json({ success: true, data: updated.rows[0] });

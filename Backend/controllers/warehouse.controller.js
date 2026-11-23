@@ -81,11 +81,20 @@ exports.getWarehouseById = async (req, res) => {
 
         // Lấy danh sách xe trực thuộc kho
         const vehiclesRes = await pool.query(`
-            SELECT id, license_plate, status, created_at
-            FROM delivery_vehicle
+            SELECT v.id, v.license_plate, v.status, v.created_at,
+                EXISTS (
+                    SELECT 1 FROM cold_chain_batch_operations o
+                    WHERE o.vehicle_id=v.id AND o.logistics_status IN ('PICKUP_ASSIGNED','OUT_FOR_DELIVERY','OUT_FOR_RETURN')
+                ) AS shipment_is_moving
+            FROM delivery_vehicle v
             WHERE warehouse_id = $1
             ORDER BY id ASC
         `, [id]);
+        const vehicles = vehiclesRes.rows.map((vehicle) => {
+            const registeredStatus = vehicle.status;
+            const operationalStatus = vehicle.shipment_is_moving ? "IN_TRANSIT" : (registeredStatus === "IDLE" ? "IDLE" : "ACTIVE");
+            return { ...vehicle, registered_status: registeredStatus, status: operationalStatus };
+        });
 
         // Lấy danh sách thiết bị gắn tại kho
         const devicesRes = await pool.query(`
@@ -120,7 +129,7 @@ exports.getWarehouseById = async (req, res) => {
             success: true,
             data: {
                 ...warehouse,
-                vehicles: vehiclesRes.rows,
+                vehicles,
                 devices: addLiveConnectionState(devicesRes.rows),
                 telemetryHistory: [...historyRes.rows].reverse()
             },
