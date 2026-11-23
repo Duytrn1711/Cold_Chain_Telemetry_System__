@@ -126,7 +126,7 @@ function renderVehicleNodes(list) {
                         ${tempText}
                     </span>
                 </div>
-                <div class="node-subtext">${subNote}</div>
+                <div class="node-subtext">${subNote}${temp !== null && veh.device_is_simulated ? " · SIMULATED DATA" : ""}</div>
                 <div class="node-subtext">${shipmentText}</div>
                 <div class="node-depot-row">
                     <span>🏢 ${depot}</span>
@@ -270,7 +270,7 @@ async function selectVehicle(id) {
         }
 
         if (nodeStat) nodeStat.textContent = device ? device.device_token : "N/A";
-        if (nodeSub) nodeSub.textContent = device ? `● ${device.connection_status || 'OFFLINE'}` : "Not Assigned";
+        if (nodeSub) nodeSub.textContent = device ? `● ${device.connection_status || 'OFFLINE'}${device.is_simulated ? " · SIMULATED DATA" : ""}` : "Not Assigned";
 
         // Update Route info
         const originTitle = document.getElementById("v-route-origin-title");

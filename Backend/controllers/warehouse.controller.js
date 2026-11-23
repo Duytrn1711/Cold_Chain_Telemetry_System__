@@ -103,26 +103,35 @@ exports.getWarehouseById = async (req, res) => {
                 d.device_token,
                 d.status,
                 d.created_at,
-                dt.temperature,
-                dt.humidity,
-                dt.created_at AS last_reading_time
+                latest.temperature,
+                latest.humidity,
+                latest.created_at AS last_reading_time,
+                latest.is_simulated
             FROM device d
-            LEFT JOIN (
-                SELECT DISTINCT ON (device_id) device_id, temperature, humidity, created_at
-                FROM data
-                ORDER BY device_id, created_at DESC, id DESC
-            ) dt ON dt.device_id = d.id
+            LEFT JOIN LATERAL (
+                SELECT temperature, humidity, created_at, is_simulated
+                FROM (
+                    SELECT temperature, humidity, created_at, FALSE AS is_simulated FROM data WHERE device_id=d.id
+                    UNION ALL
+                    SELECT temperature, humidity, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id=d.id
+                ) readings
+                ORDER BY created_at DESC, is_simulated DESC LIMIT 1
+            ) latest ON TRUE
             WHERE d.warehouse_id = $1
             ORDER BY d.id ASC
         `, [id]);
 
         const historyRes = await pool.query(`
-            SELECT dt.id, dt.device_id, d.device_token, dt.temperature, dt.humidity, dt.created_at
-            FROM data dt
-            JOIN device d ON d.id = dt.device_id
-            WHERE d.warehouse_id = $1
-            ORDER BY dt.created_at DESC
-            LIMIT 100
+            SELECT id, device_id, device_token, temperature, humidity, created_at, is_simulated
+            FROM (
+                SELECT dt.id::text AS id, dt.device_id, d.device_token, dt.temperature, dt.humidity, dt.created_at, FALSE AS is_simulated
+                FROM data dt JOIN device d ON d.id = dt.device_id WHERE d.warehouse_id = $1
+                UNION ALL
+                SELECT ('SIM-' || ts.device_id::text || '-' || floor(extract(epoch FROM ts.created_at) * 1000)::bigint::text) AS id,
+                    ts.device_id, d.device_token, ts.temperature, ts.humidity, ts.created_at, TRUE AS is_simulated
+                FROM telemetry_simulation ts JOIN device d ON d.id = ts.device_id WHERE d.warehouse_id = $1
+            ) readings
+            ORDER BY created_at DESC LIMIT 100
         `, [id]);
 
         return res.json({

@@ -33,7 +33,7 @@ async function loadDeviceDetails(devId) {
             currentDeviceData = dev;
 
             document.getElementById("detail-dev-token").textContent = `${dev.device_token} (DEV-00${dev.id})`;
-            setDeviceConnectionBadge(dev.is_online === true);
+            setDeviceConnectionBadge(dev.is_online === true, dev.is_simulated === true);
 
             const assignment = dev.warehouse_name ? `Assigned to Warehouse: ${dev.warehouse_name}` : (dev.license_plate ? `Installed on Reefer Vehicle: ${dev.license_plate}` : "Standby Sensor");
             document.getElementById("detail-dev-assignment").textContent = assignment;
@@ -62,13 +62,14 @@ async function loadDeviceDetails(devId) {
                             <td>${r.humidity === null ? "—" : `${Number(r.humidity).toFixed(0)}%`}</td>
                             <td>${new Date(r.created_at).toLocaleString("en-US", { hour12: false })}</td>
                             <td><span class="badge ${isSafe ? 'badge-active' : 'badge-critical'}">${isSafe ? 'SAFE' : 'EXCURSION'}</span></td>
+                            <td>${r.is_simulated ? '<span class="badge badge-warning">SIMULATED</span>' : '<span class="badge badge-active">SENSOR</span>'}</td>
                         </tr>
                     `;
                 }).join("");
 
                 renderDetailChart(dev.history);
             } else {
-                rawTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">No telemetry records logged for this sensor device</td></tr>`;
+                rawTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8;">No telemetry records logged for this sensor device</td></tr>`;
                 renderDetailChart([]);
             }
         }
@@ -94,7 +95,7 @@ async function refreshDeviceTelemetry() {
             return;
         }
         currentDeviceData = device;
-        setDeviceConnectionBadge(device.is_online === true);
+        setDeviceConnectionBadge(device.is_online === true, device.is_simulated === true);
         const latest = device.latestReading || history[0];
         if (latest && device.is_online) {
             const temperature = Number(latest.temperature);
@@ -126,19 +127,19 @@ function rememberDeviceReading(id) {
     if (id !== undefined && id !== null) knownDeviceReadingIds.add(String(id));
 }
 
-function setDeviceConnectionBadge(isOnline) {
+function setDeviceConnectionBadge(isOnline, isSimulated = false) {
     const badge = document.getElementById("detail-badge-status");
     if (!badge) return;
-    badge.textContent = isOnline ? "ONLINE" : "OFFLINE";
-    badge.classList.remove("badge-active", "badge-online", "badge-critical", "badge-neutral");
-    badge.classList.add(isOnline ? "badge-active" : "badge-neutral");
+    badge.textContent = isOnline ? (isSimulated ? "SIMULATED · ONLINE" : "ONLINE") : "OFFLINE";
+    badge.classList.remove("badge-active", "badge-online", "badge-critical", "badge-warning", "badge-neutral");
+    badge.classList.add(isOnline ? (isSimulated ? "badge-warning" : "badge-active") : "badge-neutral");
 }
 
 function renderDeviceReadingRow(reading) {
     const temperature = Number(reading.temperature);
     const isSafe = temperature >= 2 && temperature <= 8;
     const humidity = reading.humidity === null || reading.humidity === undefined ? "—" : `${Number(reading.humidity).toFixed(0)}%`;
-    return `<tr><td>#${reading.id}</td><td><strong class="temp-display ${isSafe ? "temp-safe" : "temp-danger"}">${temperature.toFixed(1)}°C</strong></td><td>${humidity}</td><td>${new Date(reading.created_at).toLocaleString("en-US", { hour12: false })}</td><td><span class="badge ${isSafe ? "badge-active" : "badge-critical"}">${isSafe ? "SAFE" : "EXCURSION"}</span></td></tr>`;
+    return `<tr><td>#${reading.id}</td><td><strong class="temp-display ${isSafe ? "temp-safe" : "temp-danger"}">${temperature.toFixed(1)}°C</strong></td><td>${humidity}</td><td>${new Date(reading.created_at).toLocaleString("en-US", { hour12: false })}</td><td><span class="badge ${isSafe ? "badge-active" : "badge-critical"}">${isSafe ? "SAFE" : "EXCURSION"}</span></td><td><span class="badge ${reading.is_simulated ? "badge-warning" : "badge-active"}">${reading.is_simulated ? "SIMULATED" : "SENSOR"}</span></td></tr>`;
 }
 
 function notifyDeviceTemperature(temperature) {
@@ -181,7 +182,7 @@ function renderDetailChart(history) {
             labels: labels,
             datasets: [
                 {
-                    label: "Observed Temperature (°C)",
+                    label: orderedHistory.some((reading) => reading.is_simulated) ? "Simulated Temperature (°C)" : "Observed Temperature (°C)",
                     data: temps,
                     borderColor: "#2563eb",
                     backgroundColor: "rgba(37, 99, 235, 0.08)",
@@ -192,7 +193,7 @@ function renderDetailChart(history) {
                     pointRadius: (c) => c.raw > 8.0 || c.raw < 2.0 ? 6 : 4
                 },
                 {
-                    label: "Observed Humidity (%)",
+                    label: orderedHistory.some((reading) => reading.is_simulated) ? "Simulated Humidity (%)" : "Observed Humidity (%)",
                     data: orderedHistory.map((reading) => reading.humidity === null || reading.humidity === undefined ? null : Number(reading.humidity)),
                     yAxisID: "humidity",
                     borderColor: "#0ea5e9",

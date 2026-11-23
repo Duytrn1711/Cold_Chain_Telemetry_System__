@@ -59,7 +59,7 @@ async function loadAgriBatches({ quiet = false } = {}) {
     if (refreshInProgress) return;
     refreshInProgress = true;
     const body = document.getElementById("batch-table-body");
-    if (!quiet) body.innerHTML = '<tr><td class="batch-message" colspan="8">Đang tải dữ liệu từ PostgreSQL...</td></tr>';
+    if (!quiet) body.innerHTML = '<tr><td class="batch-message" colspan="9">Đang tải dữ liệu từ PostgreSQL...</td></tr>';
     try {
         const res = await api.get("/agri-batches");
         if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || "Không thể tải danh sách lô hàng");
@@ -72,7 +72,7 @@ async function loadAgriBatches({ quiet = false } = {}) {
         agriBatches = res.data;
         renderAgriBatches();
     } catch (error) {
-        if (!quiet) body.innerHTML = `<tr><td class="batch-message" colspan="8">${safe(error.message || "Không thể kết nối API")}</td></tr>`;
+        if (!quiet) body.innerHTML = `<tr><td class="batch-message" colspan="9">${safe(error.message || "Không thể kết nối API")}</td></tr>`;
     } finally {
         refreshInProgress = false;
     }
@@ -129,7 +129,7 @@ function renderAgriBatches() {
 
     const body = document.getElementById("batch-table-body");
     if (!visible.length) {
-        body.innerHTML = `<tr><td class="batch-message" colspan="8">${agriBatches.length ? "Không có lô nào khớp bộ lọc." : "Chưa có lô hàng nào được Agri gửi sang Cold Chain."}</td></tr>`;
+        body.innerHTML = `<tr><td class="batch-message" colspan="9">${agriBatches.length ? "Không có lô nào khớp bộ lọc." : "Chưa có lô hàng nào được Agri gửi sang Cold Chain."}</td></tr>`;
         return;
     }
     body.innerHTML = visible.map((batch) => {
@@ -137,12 +137,19 @@ function renderAgriBatches() {
         const destination = isReturn ? `Hoàn về nông dân: ${batch.pickup_address}` :
             (batch.consumption_address || batch.consumption_point_name || "Đang chờ Agri cung cấp điểm tiêu thụ");
         const vehicle = assignedAssets.vehicles.find((item) => String(item.id) === String(batch.vehicle_id));
+        const isMoving = ["PICKUP_ASSIGNED", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"].includes(batch.logistics_status);
+        const hasTelemetry = isMoving && batch.telemetry_is_online === true && batch.telemetry_temperature != null;
+        const telemetryText = hasTelemetry
+            ? `${Number(batch.telemetry_temperature).toFixed(1)}°C · ${batch.telemetry_humidity == null ? "—" : `${Number(batch.telemetry_humidity).toFixed(1)}%`}`
+            : isMoving ? "Chờ số đo trực tiếp" : "Chưa vận chuyển";
+        const telemetrySource = hasTelemetry ? (batch.telemetry_is_simulated ? "MÔ PHỎNG" : "CẢM BIẾN") : "";
         return `<tr>
             <td><strong>${safe(batch.external_batch_code)}</strong><small>${safe(batch.product_name)}${batch.product_type ? ` · ${safe(batch.product_type)}` : ""}</small></td>
             <td>${safe(batch.producer_name)}<small>${safe(batch.producer_phone || batch.producer_email || "")}</small></td>
             <td>${safe(batch.pickup_address)}</td>
             <td>${safe(destination)}${batch.consumption_point_name && batch.consumption_address && !isReturn ? `<small>${safe(batch.consumption_point_name)}</small>` : ""}</td>
             <td>${safe(batch.quantity)} ${safe(batch.unit)}</td>
+            <td>${safe(telemetryText)}${telemetrySource ? `<small>${telemetrySource} · ${safe(batch.telemetry_device_token || "")}</small>` : ""}</td>
             <td><span class="batch-status ${batch.inspection_decision === "APPROVED" ? "inspection-approved" : batch.inspection_decision === "REJECTED" ? "inspection-rejected" : "inspection-pending"}">${safe(inspectionLabels[batch.inspection_decision] || batch.inspection_decision)}</span>${batch.decision_reason ? `<small>${safe(batch.decision_reason)}</small>` : ""}</td>
             <td>${safe(logisticsLabels[batch.logistics_status] || batch.logistics_status)}${batch.warehouse_id ? `<small>Điểm kiểm định #${safe(batch.warehouse_id)}</small>` : ""}</td>
             <td>${safe(vehicle?.license_plate || "Chưa gán xe")}<small>${batchAction(batch)}</small></td>
@@ -166,7 +173,7 @@ async function updateAgriBatchStatus(batchId, nextStatus, assignment = {}) {
 document.addEventListener("DOMContentLoaded", async () => {
     try { await loadAssignedAssets(); } catch (error) { console.warn("Asset lists could not be loaded:", error); }
     await loadAgriBatches();
-    window.setInterval(() => loadAgriBatches({ quiet: true }), 5000);
+    window.setInterval(() => loadAgriBatches({ quiet: true }), 1000);
     document.getElementById("batch-status-filter").addEventListener("change", renderAgriBatches);
     document.getElementById("batch-search").addEventListener("input", renderAgriBatches);
     document.getElementById("batch-refresh").addEventListener("click", loadAgriBatches);

@@ -10,6 +10,7 @@ function addLiveConnectionState(rows) {
         return {
             ...device,
             is_online: isOnline,
+            data_source: device.is_simulated ? "SIMULATED" : (isOnline ? "LIVE" : "NONE"),
             connection_status: isOnline ? "ONLINE" : "OFFLINE"
         };
     });
@@ -31,17 +32,22 @@ exports.getAllDevices = async (req, res) => {
                 d.created_at,
                 w.warehouse_name,
                 v.license_plate,
-                dt.temperature,
-                dt.humidity,
-                dt.created_at AS last_reading_time
+                latest.temperature,
+                latest.humidity,
+                latest.created_at AS last_reading_time,
+                latest.is_simulated
             FROM device d
             LEFT JOIN warehouse w ON d.warehouse_id = w.id
             LEFT JOIN delivery_vehicle v ON d.vehicle_id = v.id
-            LEFT JOIN (
-                SELECT DISTINCT ON (device_id) device_id, temperature, humidity, created_at
-                FROM data
-                ORDER BY device_id, created_at DESC
-            ) dt ON dt.device_id = d.id
+            LEFT JOIN LATERAL (
+                SELECT temperature, humidity, created_at, is_simulated
+                FROM (
+                    SELECT temperature, humidity, created_at, FALSE AS is_simulated FROM data WHERE device_id=d.id
+                    UNION ALL
+                    SELECT temperature, humidity, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id=d.id
+                ) readings
+                ORDER BY created_at DESC LIMIT 1
+            ) latest ON TRUE
             WHERE 1=1
         `;
         const params = [];
@@ -118,19 +124,28 @@ exports.getDeviceById = async (req, res) => {
 
         // Chọn 30 bản ghi mới nhất, rồi sắp xếp tăng dần để biểu đồ chạy trái sang phải.
         const historyRes = await pool.query(`
-            SELECT id, temperature, humidity, created_at
+            SELECT id, temperature, humidity, created_at, is_simulated
             FROM (
-                SELECT id, temperature, humidity, created_at
+                SELECT id::text AS id, temperature, humidity, created_at, FALSE AS is_simulated
                 FROM data
                 WHERE device_id = $1
-                ORDER BY created_at DESC, id DESC
-                LIMIT 30
-            ) recent_readings
-            ORDER BY created_at ASC, id ASC
+                UNION ALL
+                SELECT ('SIM-' || device_id::text || '-' || floor(extract(epoch FROM created_at) * 1000)::bigint::text) AS id,
+                    temperature, humidity, created_at, TRUE AS is_simulated
+                FROM telemetry_simulation
+                WHERE device_id = $1
+            ) all_readings
+            ORDER BY created_at DESC, id DESC
+            LIMIT 30
         `, [id]);
 
+        historyRes.rows.reverse();
         const lastReading = historyRes.rows.length > 0 ? historyRes.rows[historyRes.rows.length - 1] : null;
-        const [deviceWithLiveState] = addLiveConnectionState([{ ...device, last_reading_time: lastReading?.created_at || null }]);
+        const [deviceWithLiveState] = addLiveConnectionState([{
+            ...device,
+            last_reading_time: lastReading?.created_at || null,
+            is_simulated: lastReading?.is_simulated === true
+        }]);
         return res.json({
             success: true,
             data: {

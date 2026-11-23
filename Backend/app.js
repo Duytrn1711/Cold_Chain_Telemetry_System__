@@ -17,6 +17,7 @@ const alertRoutes = require("./routes/alert.routes");
 const agriBatchRoutes = require("./routes/agri-batch.routes");
 const arduinoRoutes = require("./routes/arduino.routes");
 const { startAgriAuditPoller } = require("./services/agri-audit-poller");
+const { startTelemetrySimulator } = require("./services/telemetry-simulator");
 
 const app = express();
 
@@ -101,6 +102,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Cold Chain Telemetry Server running at http://localhost:${PORT}`);
     startAgriAuditPoller();
+    startTelemetrySimulator();
 });
 
 module.exports = app;

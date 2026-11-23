@@ -8,12 +8,34 @@ const BATCH_FIELDS = `
     b.production_date, b.expiry_date, o.inspection_decision, o.decision_reason,
     o.logistics_status, o.warehouse_id, w.warehouse_name,
     o.vehicle_id, v.license_plate AS vehicle_license_plate, o.source_payload,
+    batch_sensor.device_token AS telemetry_device_token,
+    batch_sensor.temperature AS telemetry_temperature,
+    batch_sensor.humidity AS telemetry_humidity,
+    batch_sensor.is_online AS telemetry_is_online,
+    batch_sensor.is_simulated AS telemetry_is_simulated,
     o.created_at, o.updated_at, o.decided_at, o.completed_at
 `;
 const BATCH_FROM = `agri_batches b
     JOIN cold_chain_batch_operations o ON o.batch_id = b.id
     LEFT JOIN warehouse w ON w.id = o.warehouse_id
-    LEFT JOIN delivery_vehicle v ON v.id = o.vehicle_id`;
+    LEFT JOIN delivery_vehicle v ON v.id = o.vehicle_id
+    LEFT JOIN LATERAL (
+        SELECT d.device_token, latest.temperature, latest.humidity, latest.is_simulated,
+            (d.status = 'ACTIVE' AND latest.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 seconds') AS is_online
+        FROM device d
+        LEFT JOIN LATERAL (
+            SELECT temperature, humidity, created_at, is_simulated
+            FROM (
+                SELECT temperature, humidity, created_at, FALSE AS is_simulated FROM data WHERE device_id = d.id
+                UNION ALL
+                SELECT temperature, humidity, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id = d.id
+            ) readings
+            ORDER BY created_at DESC, is_simulated DESC LIMIT 1
+        ) latest ON TRUE
+        WHERE d.vehicle_id = o.vehicle_id
+        ORDER BY latest.created_at DESC NULLS LAST, d.id
+        LIMIT 1
+    ) batch_sensor ON TRUE`;
 
 const INTEGRATION_TRANSITIONS = { PENDING: "AT_INSPECTION", APPROVED: "DELIVERY_READY", REJECTED: "RETURN_READY" };
 const OPERATOR_TRANSITIONS = {

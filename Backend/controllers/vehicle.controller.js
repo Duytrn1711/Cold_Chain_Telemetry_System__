@@ -20,6 +20,7 @@ exports.getAllVehicles = async (req, res) => {
                 sensor.temperature,
                 sensor.humidity,
                 sensor.last_ping_time,
+                sensor.is_simulated AS device_is_simulated,
                 shipment.external_batch_code AS active_batch_code,
                 shipment.product_name AS shipment_product_name,
                 shipment.quantity AS shipment_quantity,
@@ -35,12 +36,15 @@ exports.getAllVehicles = async (req, res) => {
             LEFT JOIN warehouse w ON v.warehouse_id = w.id
             LEFT JOIN LATERAL (
                 SELECT d.id AS device_id, d.device_token, d.status AS device_status,
-                    latest.temperature, latest.humidity, latest.created_at AS last_ping_time
+                    latest.temperature, latest.humidity, latest.created_at AS last_ping_time, latest.is_simulated
                 FROM device d
                 LEFT JOIN LATERAL (
-                    SELECT temperature, humidity, created_at
-                    FROM data WHERE device_id = d.id
-                    ORDER BY created_at DESC, id DESC LIMIT 1
+                    SELECT temperature, humidity, created_at, is_simulated FROM (
+                        SELECT temperature, humidity, created_at, FALSE AS is_simulated FROM data WHERE device_id = d.id
+                        UNION ALL
+                        SELECT temperature, humidity, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id = d.id
+                    ) readings
+                    ORDER BY created_at DESC, is_simulated DESC LIMIT 1
                 ) latest ON TRUE
                 WHERE d.vehicle_id = v.id
                 ORDER BY latest.created_at DESC NULLS LAST, d.id ASC
@@ -92,7 +96,8 @@ exports.getAllVehicles = async (req, res) => {
             const [deviceState] = addLiveConnectionState([{
                 device_token: vehicle.device_token,
                 status: vehicle.device_status,
-                last_reading_time: vehicle.last_ping_time
+                last_reading_time: vehicle.last_ping_time,
+                is_simulated: vehicle.device_is_simulated
             }]);
             const moving = ["PICKUP_ASSIGNED", "OUT_FOR_DELIVERY", "OUT_FOR_RETURN"].includes(vehicle.shipment_status);
             const operationalStatus = moving ? "IN_TRANSIT" : (vehicle.status === "IDLE" ? "IDLE" : "ACTIVE");
@@ -166,13 +171,16 @@ exports.getVehicleById = async (req, res) => {
         // Lấy tất cả thiết bị gán trên xe
         const deviceRes = await pool.query(`
             SELECT d.id, d.device_token, d.status, d.created_at,
-                latest.temperature, latest.humidity, latest.created_at AS last_reading_time
+                latest.temperature, latest.humidity, latest.created_at AS last_reading_time, latest.is_simulated
             FROM device d
             LEFT JOIN LATERAL (
-                SELECT temperature, humidity, created_at
-                FROM data
-                WHERE device_id = d.id
-                ORDER BY created_at DESC, id DESC
+                SELECT temperature, humidity, created_at, is_simulated
+                FROM (
+                    SELECT temperature, humidity, created_at, FALSE AS is_simulated FROM data WHERE device_id = d.id
+                    UNION ALL
+                    SELECT temperature, humidity, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id = d.id
+                ) readings
+                ORDER BY created_at DESC, is_simulated DESC
                 LIMIT 1
             ) latest ON TRUE
             WHERE d.vehicle_id = $1
@@ -191,12 +199,17 @@ exports.getVehicleById = async (req, res) => {
         if (deviceRes.rows.length > 0) {
             primaryDevice = liveDevices.find((device) => device.is_online) || liveDevices[0];
             const historyRes = await pool.query(`
-                SELECT dt.id, dt.device_id, d.device_token, dt.temperature, dt.humidity, dt.created_at
-                FROM data dt
-                JOIN device d ON dt.device_id = d.id
-                WHERE d.vehicle_id = $1 AND d.id = $2
-                ORDER BY dt.created_at DESC
-                LIMIT 50
+                SELECT id, device_id, device_token, temperature, humidity, created_at, is_simulated
+                FROM (
+                    SELECT dt.id, dt.device_id, d.device_token, dt.temperature, dt.humidity, dt.created_at, FALSE AS is_simulated
+                    FROM data dt JOIN device d ON dt.device_id = d.id
+                    WHERE d.vehicle_id = $1 AND d.id = $2
+                    UNION ALL
+                    SELECT (ts.device_id * 1000000 + ts.slot)::bigint AS id, ts.device_id, d.device_token, ts.temperature, ts.humidity, ts.created_at, TRUE AS is_simulated
+                    FROM telemetry_simulation ts JOIN device d ON ts.device_id = d.id
+                    WHERE d.vehicle_id = $1 AND d.id = $2
+                ) readings
+                ORDER BY created_at DESC, id DESC LIMIT 50
             `, [id, primaryDevice.id]);
             const rowsDesc = historyRes.rows;
             if (rowsDesc.length > 0) {

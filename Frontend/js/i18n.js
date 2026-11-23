@@ -250,7 +250,11 @@
         ["No route", "Chưa có tuyến"], ["Temperature above range", "Nhiệt độ vượt ngưỡng trên"], ["Temperature below range", "Nhiệt độ thấp hơn ngưỡng"],
         ["In transit · cargo temperature safe", "Đang vận chuyển · nhiệt độ hàng hóa an toàn"], ["Agri batch route", "Lộ trình lô Agri"],
         ["Route appears when a batch is assigned.", "Lộ trình sẽ hiện khi có lô được phân công."], ["NO ACTIVE ROUTE", "KHÔNG CÓ LỘ TRÌNH ĐANG CHẠY"],
-        ["Observed Humidity (%)", "Độ ẩm ghi nhận (%)"], ["A device is online only while it sends live readings.", "Thiết bị chỉ trực tuyến khi đang gửi số đo mới."]
+        ["Observed Humidity (%)", "Độ ẩm ghi nhận (%)"], ["Simulated Temperature (°C)", "Nhiệt độ mô phỏng (°C)"],
+        ["Simulated Humidity (%)", "Độ ẩm mô phỏng (%)"], ["SIMULATED · ONLINE", "MÔ PHỎNG · TRỰC TUYẾN"],
+        ["SIMULATED DATA", "DỮ LIỆU MÔ PHỎNG"], ["SIMULATED", "MÔ PHỎNG"],
+        ["A device is online only while it sends live readings.", "Thiết bị chỉ trực tuyến khi đang gửi số đo mới."],
+        ["Online devices report every second. Simulated readings are labeled separately from Arduino data.", "Thiết bị trực tuyến gửi số đo mỗi giây. Dữ liệu mô phỏng được ghi nhãn riêng với Arduino."]
     ];
 
     const sortedPhrases = [...phrases].sort((a, b) => Math.max(b[0].length, b[1].length) - Math.max(a[0].length, a[1].length));

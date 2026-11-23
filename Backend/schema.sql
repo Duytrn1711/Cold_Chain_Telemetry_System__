@@ -63,6 +63,17 @@ CREATE TABLE data (
         REFERENCES device(id)
 );
 
+-- Isolated ring buffer for generated demo telemetry; never mixes with real sensor data.
+CREATE TABLE telemetry_simulation (
+    device_id BIGINT NOT NULL REFERENCES device(id) ON DELETE CASCADE,
+    slot SMALLINT NOT NULL CHECK (slot >= 0 AND slot < 60),
+    temperature NUMERIC(5, 2) NOT NULL,
+    humidity NUMERIC(5, 2) NOT NULL CHECK (humidity >= 0 AND humidity <= 100),
+    created_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (device_id, slot)
+);
+CREATE INDEX idx_telemetry_simulation_recent ON telemetry_simulation (device_id, created_at DESC);
+
 
 -- =========================================
 -- 5. ALERT

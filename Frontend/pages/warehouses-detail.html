@@ -173,14 +173,14 @@
                             const online = d.is_online === true;
                             const temperature = online && d.temperature !== null && d.temperature !== undefined ? `${Number(d.temperature).toFixed(2)}°C` : "No live data";
                             const humidity = online && d.humidity !== null && d.humidity !== undefined ? `${Number(d.humidity).toFixed(2)}%` : "—";
-                            const status = online ? "ONLINE" : (d.status === "ACTIVE" ? "OFFLINE" : "INACTIVE");
+                            const status = online ? (d.is_simulated ? "SIMULATED · ONLINE" : "ONLINE") : (d.status === "ACTIVE" ? "OFFLINE" : "INACTIVE");
                             return `
                                 <tr>
                                     <td>${d.id}</td>
                                     <td class="cell-code">${d.device_token}</td>
                                     <td><span class="temp-display ${online ? "temp-safe" : ""}">${temperature}</span></td>
                                     <td>${humidity}</td>
-                                    <td><span class="badge ${online ? "badge-active" : "badge-neutral"}">${status}</span></td>
+                                    <td><span class="badge ${online ? (d.is_simulated ? "badge-warning" : "badge-active") : "badge-neutral"}">${status}</span></td>
                                     <td><button class="btn-table-action" onclick="window.location.href='devices-detail.html?id=${d.id}'">View Sensor</button></td>
                                 </tr>
                             `;

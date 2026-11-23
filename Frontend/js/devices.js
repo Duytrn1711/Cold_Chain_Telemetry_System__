@@ -92,8 +92,8 @@ function renderDevicesTable(list) {
         const humidity = isOnline && device.humidity !== null && device.humidity !== undefined ? Number(device.humidity) : null;
         const humidityText = humidity === null ? "—" : `${humidity.toFixed(1)}%`;
         const registeredActive = String(device.status || "").toUpperCase() === "ACTIVE";
-        const state = isOnline ? "ONLINE" : (registeredActive ? "OFFLINE" : "INACTIVE");
-        const stateClass = isOnline ? (excursion ? "badge-warning" : "badge-online") : "badge-neutral";
+        const state = isOnline ? (device.is_simulated ? "SIMULATED · ONLINE" : "ONLINE") : (registeredActive ? "OFFLINE" : "INACTIVE");
+        const stateClass = isOnline ? (device.is_simulated ? "badge-warning" : (excursion ? "badge-warning" : "badge-online")) : "badge-neutral";
         return `<tr>
             <td><strong class="cell-code">${device.id}</strong></td>
             <td class="cell-code">${device.device_token}</td>
