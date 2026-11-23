@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     await loadDeviceDetails(devId);
-    detailRefreshTimer = window.setInterval(refreshDeviceTelemetry, 3000);
+    detailRefreshTimer = window.setInterval(refreshDeviceTelemetry, 1000);
 });
 
 async function loadDeviceDetails(devId) {
@@ -190,6 +190,18 @@ function renderDetailChart(history) {
                     fill: true,
                     pointBackgroundColor: (c) => c.raw > 8.0 || c.raw < 2.0 ? "#ef4444" : "#2563eb",
                     pointRadius: (c) => c.raw > 8.0 || c.raw < 2.0 ? 6 : 4
+                },
+                {
+                    label: "Observed Humidity (%)",
+                    data: orderedHistory.map((reading) => reading.humidity === null || reading.humidity === undefined ? null : Number(reading.humidity)),
+                    yAxisID: "humidity",
+                    borderColor: "#0ea5e9",
+                    backgroundColor: "rgba(14, 165, 233, 0.08)",
+                    borderWidth: 2,
+                    tension: 0.35,
+                    fill: false,
+                    spanGaps: true,
+                    pointRadius: 3
                 }
             ]
         },
@@ -204,6 +216,13 @@ function renderDetailChart(history) {
                     grid: {
                         color: (c) => c.tick.value === 2 || c.tick.value === 8 ? "rgba(37,99,235,0.3)" : "rgba(226,232,240,0.6)"
                     }
+                },
+                humidity: {
+                    position: "right",
+                    min: 0,
+                    max: 100,
+                    ticks: { callback: (v) => `${v}%` },
+                    grid: { drawOnChartArea: false }
                 }
             }
         }

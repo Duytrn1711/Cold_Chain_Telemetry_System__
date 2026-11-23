@@ -2,15 +2,11 @@ const pool = require("../db");
 const LIVE_DEVICE_WINDOW_MS = 90 * 1000;
 
 function addLiveConnectionState(rows) {
-    const arduinoToken = String(process.env.ARDUINO_DEVICE_TOKEN || "").trim();
     const now = Date.now();
     return rows.map((device) => {
         const lastReadingTime = device.last_reading_time ? new Date(device.last_reading_time).getTime() : NaN;
-        const hasRecentArduinoReading = Boolean(
-            arduinoToken && device.device_token === arduinoToken &&
-            Number.isFinite(lastReadingTime) && now - lastReadingTime >= 0 && now - lastReadingTime <= LIVE_DEVICE_WINDOW_MS
-        );
-        const isOnline = device.status === "ACTIVE" && hasRecentArduinoReading;
+        const hasRecentReading = Number.isFinite(lastReadingTime) && now - lastReadingTime >= 0 && now - lastReadingTime <= LIVE_DEVICE_WINDOW_MS;
+        const isOnline = device.status === "ACTIVE" && hasRecentReading;
         return {
             ...device,
             is_online: isOnline,

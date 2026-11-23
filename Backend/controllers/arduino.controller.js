@@ -44,7 +44,8 @@ exports.authorizeArduino = authorizeArduino;
 exports.ingestTelemetry = async (req, res) => {
     const body = req.body || {};
     const configuredToken = String(process.env.ARDUINO_DEVICE_TOKEN || "").trim();
-    const deviceToken = configuredToken || (typeof body.device_token === "string" ? body.device_token.trim() : "");
+    const suppliedDeviceToken = typeof body.device_token === "string" ? body.device_token.trim() : "";
+    const deviceToken = suppliedDeviceToken || configuredToken;
     const temperature = Number(body.temperature);
     const humidity = body.humidity === undefined || body.humidity === null || body.humidity === ""
         ? 0 : Number(body.humidity);
@@ -70,6 +71,12 @@ exports.ingestTelemetry = async (req, res) => {
         await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`arduino-device:${deviceToken}`]);
         let device = await client.query("SELECT id, status FROM device WHERE device_token = $1 FOR UPDATE", [deviceToken]);
         if (!device.rowCount) {
+            // The legacy single-Arduino bridge may auto-register its configured device.
+            // Additional sensors must first be registered in Device Management and assigned there.
+            if (deviceToken !== configuredToken) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({ success: false, data: null, message: "Unknown device token; register the device before sending telemetry" });
+            }
             const insertedDevice = await insertWithGeneratedId(client, "device",
                 ["device_token", "warehouse_id", "vehicle_id", "status", "created_at"],
                 [deviceToken, warehouseId, vehicleId, "ACTIVE", new Date()]);

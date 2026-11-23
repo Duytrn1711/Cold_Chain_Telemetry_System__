@@ -249,7 +249,8 @@
         ["Receiving warehouse:", "Kho tiếp nhận:"], ["No active shipment", "Không có lô đang hoạt động"], ["Destination not assigned", "Chưa có điểm đến"],
         ["No route", "Chưa có tuyến"], ["Temperature above range", "Nhiệt độ vượt ngưỡng trên"], ["Temperature below range", "Nhiệt độ thấp hơn ngưỡng"],
         ["In transit · cargo temperature safe", "Đang vận chuyển · nhiệt độ hàng hóa an toàn"], ["Agri batch route", "Lộ trình lô Agri"],
-        ["Route appears when a batch is assigned.", "Lộ trình sẽ hiện khi có lô được phân công."], ["NO ACTIVE ROUTE", "KHÔNG CÓ LỘ TRÌNH ĐANG CHẠY"]
+        ["Route appears when a batch is assigned.", "Lộ trình sẽ hiện khi có lô được phân công."], ["NO ACTIVE ROUTE", "KHÔNG CÓ LỘ TRÌNH ĐANG CHẠY"],
+        ["Observed Humidity (%)", "Độ ẩm ghi nhận (%)"], ["A device is online only while it sends live readings.", "Thiết bị chỉ trực tuyến khi đang gửi số đo mới."]
     ];
 
     const sortedPhrases = [...phrases].sort((a, b) => Math.max(b[0].length, b[1].length) - Math.max(a[0].length, a[1].length));

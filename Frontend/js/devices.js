@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initRegisterModal();
     initTabs();
     renderDeviceDetailChart();
-    window.setInterval(() => loadDevices(true), 5000);
+    window.setInterval(() => loadDevices(true), 1000);
 });
 
 async function populateDeviceAssignments() {
@@ -79,7 +79,7 @@ function renderDevicesTable(list) {
     const tbody = document.getElementById("devices-tbody");
     if (!tbody) return;
     if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#64748b;">No registered devices match this filter.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#64748b;">No registered devices match this filter.</td></tr>';
         return;
     }
     tbody.innerHTML = list.map((device) => {
@@ -89,6 +89,8 @@ function renderDevicesTable(list) {
         const entity = device.warehouse_name || device.license_plate || "Unassigned";
         const kind = device.warehouse_name ? "Warehouse" : (device.license_plate ? "Delivery vehicle" : "Unassigned");
         const temperatureText = temperature === null ? "No live data" : `${temperature.toFixed(1)}°C`;
+        const humidity = isOnline && device.humidity !== null && device.humidity !== undefined ? Number(device.humidity) : null;
+        const humidityText = humidity === null ? "—" : `${humidity.toFixed(1)}%`;
         const registeredActive = String(device.status || "").toUpperCase() === "ACTIVE";
         const state = isOnline ? "ONLINE" : (registeredActive ? "OFFLINE" : "INACTIVE");
         const stateClass = isOnline ? (excursion ? "badge-warning" : "badge-online") : "badge-neutral";
@@ -100,6 +102,7 @@ function renderDevicesTable(list) {
             <td style="color:#64748b">Not collected</td>
             <td style="color:#64748b">Not collected</td>
             <td><span class="temp-display ${excursion ? "temp-danger" : (isOnline ? "temp-safe" : "")}">${temperatureText}</span></td>
+            <td>${humidityText}</td>
             <td><span class="badge ${stateClass}">${state}</span></td>
             <td><div style="display:flex;gap:6px;">
                 <button type="button" class="btn-table-action" onclick="window.location.href='devices-detail.html?id=${device.id}'">Details</button>
