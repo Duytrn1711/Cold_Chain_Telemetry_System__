@@ -84,7 +84,7 @@ function renderVehicleNodes(list) {
 
     container.innerHTML = list.map((veh) => {
         const isSelected = veh.id == selectedVehicleId;
-        const temp = veh.temperature !== null && veh.temperature !== undefined ? parseFloat(veh.temperature) : null;
+        const temp = veh.device_is_online && veh.temperature !== null && veh.temperature !== undefined ? parseFloat(veh.temperature) : null;
         const isExcursion = temp !== null && (temp > 8.0 || temp < 2.0);
         const badgeClass = temp === null ? "badge-offline" : (isExcursion ? "badge-critical" : "badge-online");
         const tempText = temp !== null 
@@ -159,7 +159,7 @@ async function selectVehicle(id) {
         const nodeSub = document.getElementById("v-stat-node-sub");
         const statusBadge = document.getElementById("v-detail-status-badge");
 
-        if (reading && reading.temperature !== null) {
+        if (reading && reading.temperature !== null && device?.is_online) {
             const tempVal = parseFloat(reading.temperature);
             const humVal = reading.humidity !== null ? parseFloat(reading.humidity) : null;
             const isHigh = tempVal > 8.0;
@@ -242,7 +242,7 @@ async function selectVehicle(id) {
         }
 
         if (nodeStat) nodeStat.textContent = device ? device.device_token : "N/A";
-        if (nodeSub) nodeSub.textContent = device ? `● ${device.status || 'ACTIVE'}` : "Not Assigned";
+        if (nodeSub) nodeSub.textContent = device ? `● ${device.connection_status || 'OFFLINE'}` : "Not Assigned";
 
         // Update Route info
         const originTitle = document.getElementById("v-route-origin-title");

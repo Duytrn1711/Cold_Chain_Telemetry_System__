@@ -18,6 +18,7 @@ function addLiveConnectionState(rows) {
         };
     });
 }
+exports.addLiveConnectionState = addLiveConnectionState;
 
 // GET /api/devices - Lấy danh sách thiết bị cảm biến IoT
 exports.getAllDevices = async (req, res) => {

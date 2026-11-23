@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { addLiveConnectionState } = require("./device.controller");
 
 // GET /api/vehicles - Danh sách xe tải lạnh kèm thông tin kho và telemetry gần nhất
 exports.getAllVehicles = async (req, res) => {
@@ -15,6 +16,7 @@ exports.getAllVehicles = async (req, res) => {
                 w.warehouse_name,
                 d.id AS device_id,
                 d.device_token,
+                d.status AS device_status,
                 dt.temperature,
                 dt.humidity,
                 dt.created_at AS last_ping_time,
@@ -62,9 +64,18 @@ exports.getAllVehicles = async (req, res) => {
 
         const result = await pool.query(query, params);
 
+        const vehicles = result.rows.map((vehicle) => {
+            const [deviceState] = addLiveConnectionState([{
+                device_token: vehicle.device_token,
+                status: vehicle.device_status,
+                last_reading_time: vehicle.last_ping_time
+            }]);
+            return { ...vehicle, device_is_online: deviceState.is_online };
+        });
+
         return res.json({
             success: true,
-            data: result.rows,
+            data: vehicles,
             message: "Lấy danh sách xe tải lạnh thành công"
         });
     } catch (error) {
@@ -118,11 +129,20 @@ exports.getVehicleById = async (req, res) => {
 
         // Lấy tất cả thiết bị gán trên xe
         const deviceRes = await pool.query(`
-            SELECT id, device_token, status, created_at
-            FROM device
-            WHERE vehicle_id = $1
-            ORDER BY id ASC
+            SELECT d.id, d.device_token, d.status, d.created_at,
+                latest.temperature, latest.humidity, latest.created_at AS last_reading_time
+            FROM device d
+            LEFT JOIN LATERAL (
+                SELECT temperature, humidity, created_at
+                FROM data
+                WHERE device_id = d.id
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+            ) latest ON TRUE
+            WHERE d.vehicle_id = $1
+            ORDER BY d.id ASC
         `, [id]);
+        const liveDevices = addLiveConnectionState(deviceRes.rows);
 
         let telemetryHistory = [];
         let latestReading = null;
@@ -148,8 +168,8 @@ exports.getVehicleById = async (req, res) => {
             success: true,
             data: {
                 ...vehicle,
-                device: deviceRes.rows[0] || null,
-                devices: deviceRes.rows,
+                device: liveDevices[0] || null,
+                devices: liveDevices,
                 latestReading,
                 telemetryHistory,
                 recentPings: telemetryHistory.slice().reverse(),

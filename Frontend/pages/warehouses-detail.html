@@ -151,8 +151,12 @@
         let currentWarehouseData = null;
 
         document.addEventListener("DOMContentLoaded", async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const whId = urlParams.get("id") || "1";
+            await loadWarehouseDetail();
+            window.setInterval(loadWarehouseDetail, 5000);
+        });
+
+        async function loadWarehouseDetail() {
+            const whId = new URLSearchParams(window.location.search).get("id") || "1";
             try {
                 const res = await api.get(`/warehouses/${whId}`);
                 if (res.success && res.data) {
@@ -165,16 +169,22 @@
 
                     const devTbody = document.getElementById("detail-devices-tbody");
                     if (wh.devices && wh.devices.length > 0) {
-                        devTbody.innerHTML = wh.devices.map(d => `
-                            <tr>
-                                <td>${d.id}</td>
-                                <td class="cell-code">${d.device_token}</td>
-                                <td><span class="temp-display temp-safe">${d.temperature ? d.temperature + '°C' : '4.2°C'}</span></td>
-                                <td>${d.humidity ? d.humidity + '%' : '78%'}</td>
-                                <td><span class="badge badge-active">${d.status}</span></td>
-                                <td><button class="btn-table-action" onclick="window.location.href='devices-detail.html?id=${d.id}'">View Sensor</button></td>
-                            </tr>
-                        `).join("");
+                        devTbody.innerHTML = wh.devices.map(d => {
+                            const online = d.is_online === true;
+                            const temperature = online && d.temperature !== null && d.temperature !== undefined ? `${Number(d.temperature).toFixed(2)}°C` : "No live data";
+                            const humidity = online && d.humidity !== null && d.humidity !== undefined ? `${Number(d.humidity).toFixed(2)}%` : "—";
+                            const status = online ? "ONLINE" : (d.status === "ACTIVE" ? "OFFLINE" : "INACTIVE");
+                            return `
+                                <tr>
+                                    <td>${d.id}</td>
+                                    <td class="cell-code">${d.device_token}</td>
+                                    <td><span class="temp-display ${online ? "temp-safe" : ""}">${temperature}</span></td>
+                                    <td>${humidity}</td>
+                                    <td><span class="badge ${online ? "badge-active" : "badge-neutral"}">${status}</span></td>
+                                    <td><button class="btn-table-action" onclick="window.location.href='devices-detail.html?id=${d.id}'">View Sensor</button></td>
+                                </tr>
+                            `;
+                        }).join("");
                     } else {
                         devTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#94a3b8; padding:20px;">No sensor devices attached to this facility</td></tr>`;
                     }
@@ -196,7 +206,7 @@
             } catch (err) {
                 showToast("Error loading warehouse details", "error");
             }
-        });
+        }
 
         function showFacilityAudit() {
             const whName = currentWarehouseData ? currentWarehouseData.warehouse_name : "Warehouse";

@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { addLiveConnectionState } = require("./device.controller");
 
 // GET /api/warehouses - Lấy danh sách kho lạnh
 exports.getAllWarehouses = async (req, res) => {
@@ -94,12 +95,13 @@ exports.getWarehouseById = async (req, res) => {
                 d.status,
                 d.created_at,
                 dt.temperature,
-                dt.humidity
+                dt.humidity,
+                dt.created_at AS last_reading_time
             FROM device d
             LEFT JOIN (
-                SELECT DISTINCT ON (device_id) device_id, temperature, humidity
+                SELECT DISTINCT ON (device_id) device_id, temperature, humidity, created_at
                 FROM data
-                ORDER BY device_id, created_at DESC
+                ORDER BY device_id, created_at DESC, id DESC
             ) dt ON dt.device_id = d.id
             WHERE d.warehouse_id = $1
             ORDER BY d.id ASC
@@ -119,7 +121,7 @@ exports.getWarehouseById = async (req, res) => {
             data: {
                 ...warehouse,
                 vehicles: vehiclesRes.rows,
-                devices: devicesRes.rows,
+                devices: addLiveConnectionState(devicesRes.rows),
                 telemetryHistory: [...historyRes.rows].reverse()
             },
             message: "Lấy chi tiết kho thành công"
