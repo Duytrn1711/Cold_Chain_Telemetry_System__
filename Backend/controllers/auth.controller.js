@@ -188,11 +188,11 @@ exports.reviewRegistrationRequest = async (req, res) => {
     try {
         const result = await pool.query(`
             UPDATE users SET
-                status = $2,
-                role = CASE WHEN $2 = 'ACTIVE' THEN $3 ELSE role END,
-                reviewed_by = $4,
+                status = $2::VARCHAR,
+                role = CASE WHEN $2::VARCHAR = 'ACTIVE'::VARCHAR THEN $3::VARCHAR ELSE role END,
+                reviewed_by = $4::BIGINT,
                 reviewed_at = CURRENT_TIMESTAMP
-            WHERE id = $1 AND status = 'PENDING'
+            WHERE id = $1::BIGINT AND status = 'PENDING'::VARCHAR
             RETURNING id, username, email, full_name, role, status, reviewed_by, reviewed_at
         `, [req.params.id, decision === "APPROVE" ? "ACTIVE" : "REJECTED", requestedRole || null, req.user.id]);
         if (!result.rowCount) {
