@@ -1,6 +1,6 @@
 const pool = require("../db");
 
-// GET /api/tracking: deliberately limited to batches currently on a vehicle route.
+// GET /api/tracking: active batches with an assigned vehicle, excluding completed/cancelled loads.
 exports.getMovingBatches = async (req, res) => {
     try {
         const result = await pool.query(`
@@ -16,22 +16,24 @@ exports.getMovingBatches = async (req, res) => {
                 o.updated_at,
                 v.license_plate,
                 CASE
-                    WHEN o.logistics_status IN ('OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
+                    WHEN o.logistics_status IN ('DELIVERY_READY', 'RETURN_READY', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
                         THEN COALESCE(w.warehouse_name, b.origin)
                     ELSE b.origin
                 END AS route_origin,
                 CASE
-                    WHEN o.logistics_status = 'OUT_FOR_DELIVERY' THEN o.consumption_address
-                    WHEN o.logistics_status = 'OUT_FOR_RETURN' THEN b.origin
+                    WHEN o.logistics_status IN ('DELIVERY_READY', 'OUT_FOR_DELIVERY') THEN o.consumption_address
+                    WHEN o.logistics_status IN ('RETURN_READY', 'OUT_FOR_RETURN') THEN b.origin
                     ELSE w.warehouse_name
                 END AS route_destination
             FROM cold_chain_batch_operations o
             JOIN agri_batches b ON b.id = o.batch_id
             JOIN delivery_vehicle v ON v.id = o.vehicle_id
             LEFT JOIN warehouse w ON w.id = o.warehouse_id
-            WHERE o.logistics_status IN ('PICKUP_ASSIGNED', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN')
+            WHERE o.logistics_status IN (
+                'PICKUP_ASSIGNED', 'PICKED_UP', 'AT_INSPECTION',
+                'DELIVERY_READY', 'RETURN_READY', 'OUT_FOR_DELIVERY', 'OUT_FOR_RETURN'
+            )
             ORDER BY o.updated_at DESC, o.external_batch_code
-            LIMIT 250
         `);
 
         return res.json({

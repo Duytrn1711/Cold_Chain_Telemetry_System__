@@ -15,6 +15,8 @@
         .tracking-header p{margin:0;color:#64748b}
         .tracking-summary{display:flex;align-items:center;gap:14px;margin:18px 0;padding:16px 18px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;color:#475569}
         .tracking-summary strong{font-size:22px;color:#1d4ed8}
+        .tracking-tools{margin:18px 0;padding:14px;background:#fff;border:1px solid #e2e8f0;border-radius:12px}
+        .tracking-search{width:min(100%,560px);height:44px;padding:0 14px;border:1px solid #cbd5e1;border-radius:9px;color:#0f172a;font:inherit}
         .tracking-card{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
         .tracking-table{width:100%;min-width:1050px;border-collapse:collapse}
         .tracking-table th,.tracking-table td{padding:14px 15px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}
@@ -38,10 +40,11 @@
             </header>
             <main class="tracking-content">
                 <header class="tracking-header">
-                    <div><h1>Lô hàng đang vận chuyển</h1><p>Chỉ hiển thị lô đang trên đường, xe được phân công và tuyến từ điểm đi đến điểm đến.</p></div>
+                    <div><h1>Lô hàng đang vận chuyển</h1><p>Tra cứu các lô đang được xử lý cùng trạng thái hiện tại, xe phụ trách và lộ trình.</p></div>
                     <button type="button" class="btn btn-secondary" id="tracking-refresh">Làm mới</button>
                 </header>
                 <section class="tracking-summary" aria-live="polite"><span>Đang vận chuyển</span><strong id="tracking-count">—</strong><span id="tracking-updated">Đang tải…</span></section>
+                <section class="tracking-tools"><input class="tracking-search" id="tracking-search" type="search" placeholder="Tìm theo mã lô, sản phẩm, biển số xe hoặc lộ trình…" aria-label="Tìm lô hàng"></section>
                 <section class="tracking-card">
                     <table class="tracking-table">
                         <thead><tr><th>MÃ LÔ / SẢN PHẨM</th><th>SỐ LƯỢNG</th><th>TRẠNG THÁI</th><th>XE</th><th>LỘ TRÌNH</th></tr></thead>
