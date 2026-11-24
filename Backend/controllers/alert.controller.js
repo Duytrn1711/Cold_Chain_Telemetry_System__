@@ -1,10 +1,10 @@
 const pool = require("../db");
 
-// GET /api/alerts/summary - current unresolved alert count for the navigation badge.
+// GET /api/alerts/summary - alerts awaiting acknowledgement for the navigation badge.
 exports.getAlertSummary = async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT COUNT(*) FILTER (WHERE status IS DISTINCT FROM 'RESOLVED')::INT AS active_count
+            SELECT COUNT(*) FILTER (WHERE status = 'OPEN')::INT AS active_count
             FROM alert
         `);
         return res.json({ success: true, data: { active_count: result.rows[0].active_count } });
@@ -145,26 +145,50 @@ exports.getAlertById = async (req, res) => {
 
 exports.updateAlertStatus = async (req, res) => {
     const { id } = req.params;
-    const nextStatus = req.body.status === "RESOLVED" ? "RESOLVED" : "ACKNOWLEDGED";
+    const nextStatus = String((req.body || {}).status || "").toUpperCase();
+    if (!/^\d{1,19}$/.test(String(id)) || !["RESOLVED", "ACKNOWLEDGED"].includes(nextStatus)) {
+        return res.status(400).json({ success: false, data: null, message: "Mã cảnh báo hoặc trạng thái không hợp lệ" });
+    }
     try {
         const result = await pool.query(`
             UPDATE alert
-            SET status = $2,
-                acknowledged_by = COALESCE(acknowledged_by, $3),
+            SET status = $2::VARCHAR,
+                acknowledged_by = COALESCE(acknowledged_by, $3::BIGINT),
                 acknowledged_at = COALESCE(acknowledged_at, CURRENT_TIMESTAMP),
-                resolved_at = CASE WHEN $2 = 'RESOLVED' THEN CURRENT_TIMESTAMP ELSE resolved_at END
-            WHERE id = $1 AND status <> 'RESOLVED'
+                resolved_at = CASE WHEN $2::VARCHAR = 'RESOLVED'::VARCHAR THEN CURRENT_TIMESTAMP ELSE resolved_at END
+            WHERE id = $1::BIGINT AND status <> 'RESOLVED'::VARCHAR
             RETURNING id, status, acknowledged_by, acknowledged_at, resolved_at
         `, [id, nextStatus, req.user.id]);
         if (!result.rowCount) {
-            const current = await pool.query("SELECT id, status FROM alert WHERE id = $1", [id]);
+            const current = await pool.query("SELECT id, status, acknowledged_by, acknowledged_at, resolved_at FROM alert WHERE id = $1::BIGINT", [id]);
             if (!current.rowCount) return res.status(404).json({ success: false, data: null, message: "Không tìm thấy cảnh báo" });
             return res.json({ success: true, data: current.rows[0], message: "Cảnh báo đã được xử lý" });
         }
         return res.json({ success: true, data: result.rows[0], message: "Cập nhật trạng thái cảnh báo thành công" });
     } catch (error) {
-        console.error("Alert status update error:", error);
+        console.error("Alert status update error:", error.code || "unknown");
         return res.status(500).json({ success: false, data: null, message: "Không thể cập nhật trạng thái cảnh báo" });
+    }
+};
+
+exports.acknowledgeAllAlerts = async (req, res) => {
+    try {
+        const result = await pool.query(`
+            UPDATE alert
+            SET status = 'ACKNOWLEDGED'::VARCHAR,
+                acknowledged_by = COALESCE(acknowledged_by, $1::BIGINT),
+                acknowledged_at = COALESCE(acknowledged_at, CURRENT_TIMESTAMP)
+            WHERE status = 'OPEN'::VARCHAR
+            RETURNING id
+        `, [req.user.id]);
+        return res.json({
+            success: true,
+            data: { acknowledged_count: result.rowCount },
+            message: `Đã xác nhận ${result.rowCount} cảnh báo đang mở`
+        });
+    } catch (error) {
+        console.error("Acknowledge all alerts error:", error.code || "unknown");
+        return res.status(500).json({ success: false, data: null, message: "Không thể xác nhận các cảnh báo" });
     }
 };
 

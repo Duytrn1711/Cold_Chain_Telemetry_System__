@@ -101,9 +101,16 @@ exports.ingestTelemetry = async (req, res) => {
             const isHigh = temperature > 8;
             const alertType = isHigh ? "NHIỆT ĐỘ QUÁ CAO" : "NHIỆT ĐỘ QUÁ THẤP";
             const alertContent = `Arduino ${deviceToken} ghi nhận ${temperature.toFixed(2)}°C, ngoài ngưỡng an toàn 2.0–8.0°C.`;
-            await insertWithGeneratedId(client, "alert",
-                ["device_id", "alert_type", "alert_content", "created_at"],
-                [device.rows[0].id, alertType, alertContent, new Date()]);
+            const activeAlert = await client.query(`
+                SELECT id FROM alert
+                WHERE device_id = $1 AND alert_type = $2 AND status <> 'RESOLVED'
+                LIMIT 1 FOR UPDATE
+            `, [device.rows[0].id, alertType]);
+            if (!activeAlert.rowCount) {
+                await insertWithGeneratedId(client, "alert",
+                    ["device_id", "alert_type", "alert_content", "created_at"],
+                    [device.rows[0].id, alertType, alertContent, new Date()]);
+            }
         }
 
         await client.query("COMMIT");

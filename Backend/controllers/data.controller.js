@@ -269,21 +269,17 @@ exports.createData = async (req, res) => {
             const alertType = isHigh ? "NHIỆT ĐỘ QUÁ CAO" : "NHIỆT ĐỘ QUÁ THẤP";
             const alertContent = `Phát hiện: Thiết bị #${device_id} có nhiệt độ ${tempVal.toFixed(2)}°C vượt ngưỡng an toàn chuỗi lạnh (2.0°C - 8.0°C).`;
 
-            for (let aAttempt = 0; aAttempt < 5; aAttempt++) {
-                try {
-                    const maxAlertId = await pool.query("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM alert");
-                    await pool.query(`
-                        INSERT INTO alert (id, device_id, alert_type, alert_content, created_at)
-                        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-                    `, [Number(maxAlertId.rows[0].next_id) + aAttempt, device_id, alertType, alertContent]);
-                    break;
-                } catch (aErr) {
-                    if (aErr.code === "23505" && aAttempt < 4) {
-                        await new Promise(r => setTimeout(r, 40 * (aAttempt + 1)));
-                        continue;
-                    }
-                    throw aErr;
-                }
+            const activeAlert = await pool.query(`
+                SELECT id FROM alert
+                WHERE device_id = $1 AND alert_type = $2 AND status <> 'RESOLVED'
+                LIMIT 1
+            `, [device_id, alertType]);
+            if (!activeAlert.rowCount) {
+                const maxAlertId = await pool.query("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM alert");
+                await pool.query(`
+                    INSERT INTO alert (id, device_id, alert_type, alert_content, created_at)
+                    VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                `, [maxAlertId.rows[0].next_id, device_id, alertType, alertContent]);
             }
         }
 

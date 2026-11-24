@@ -201,6 +201,7 @@ function renderAlertsQueue(list) {
         const isCritical = ev.severity === "CRITICAL";
         const isWarning = ev.severity === "WARNING";
         const isResolved = ev.status === "RESOLVED";
+        const isAcknowledged = ev.status === "ACKNOWLEDGED";
 
         let badgeClass = "badge-neutral";
         if (isResolved) badgeClass = "badge-idle";
@@ -214,7 +215,7 @@ function renderAlertsQueue(list) {
                 <td>
                     <span class="badge ${badgeClass}">
                         <span class="badge-dot"></span>
-                        ${isResolved ? 'RESOLVED' : ev.severity}
+                        ${isResolved ? 'RESOLVED' : (isAcknowledged ? 'ACKNOWLEDGED' : ev.severity)}
                     </span>
                 </td>
                 <td class="cell-code" style="font-weight:600;">${ev.device_id}</td>
@@ -308,8 +309,16 @@ function selectIncidentObject(inc, shouldScroll = true) {
     const badgeEl = document.getElementById("inc-detail-badge");
     if (badgeEl) {
         const isResolved = inc.status === "RESOLVED";
-        badgeEl.textContent = isResolved ? "RESOLVED" : inc.severity;
-        badgeEl.className = `badge ${isResolved ? 'badge-idle' : (inc.severity === 'CRITICAL' ? 'badge-critical' : 'badge-warning')}`;
+        const isAcknowledged = inc.status === "ACKNOWLEDGED";
+        badgeEl.textContent = isResolved ? "RESOLVED" : (isAcknowledged ? "ACKNOWLEDGED" : inc.severity);
+        badgeEl.className = `badge ${isResolved || isAcknowledged ? 'badge-idle' : (inc.severity === 'CRITICAL' ? 'badge-critical' : 'badge-warning')}`;
+    }
+    const acknowledgeButton = document.getElementById("acknowledge-alert-btn");
+    if (acknowledgeButton) {
+        const isAcknowledged = inc.status === "ACKNOWLEDGED";
+        const isResolved = inc.status === "RESOLVED";
+        acknowledgeButton.disabled = isAcknowledged || isResolved;
+        acknowledgeButton.textContent = isResolved ? "✓ Resolved" : (isAcknowledged ? "✓ Acknowledged" : "✓ Acknowledge Alert");
     }
 
     // 3. Metric Card Styling & Content
@@ -533,10 +542,11 @@ async function acknowledgeAlert() {
     }
 
     try {
-        const response = await api.request(`/alerts/${currentSelectedIncident.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "ACKNOWLEDGED" }) });
+        const alertId = currentSelectedIncident.id;
+        const response = await api.request(`/alerts/${alertId}/status`, { method: "PATCH", body: JSON.stringify({ status: "ACKNOWLEDGED" }) });
         if (!response.success) throw new Error(response.message || "Could not acknowledge alert");
         await loadAlerts();
-        showToast(`Alert #${currentSelectedIncident.id} acknowledged and saved.`, "success");
+        showToast(`Alert #${alertId} acknowledged and saved.`, "success");
     } catch (error) {
         showToast(error.message || "Could not acknowledge alert", "error");
     }
@@ -547,13 +557,17 @@ async function acknowledgeAlert() {
  */
 async function markAllAcknowledged() {
     if (window.Roles && !Roles.guard("acknowledge", "Staff accounts can view alerts but cannot acknowledge them.")) return;
-    const openAlerts = allAlerts.filter((item) => item.status === "OPEN");
+    const button = document.getElementById("acknowledge-all-btn");
+    if (button) button.disabled = true;
     try {
-        await Promise.all(openAlerts.map((item) => api.request(`/alerts/${item.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "ACKNOWLEDGED" }) })));
+        const response = await api.request("/alerts/acknowledge-all", { method: "POST", body: JSON.stringify({}) });
+        if (!response.success) throw new Error(response.message || "Could not acknowledge alerts");
         await loadAlerts();
-        showToast(`Acknowledged ${openAlerts.length} open alerts.`, "success");
+        showToast(response.message || `Đã xác nhận ${response.data?.acknowledged_count || 0} cảnh báo đang mở`, "success");
     } catch (error) {
         showToast(error.message || "Could not acknowledge alerts", "error");
+    } finally {
+        if (button) button.disabled = false;
     }
 }
 

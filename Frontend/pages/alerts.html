@@ -356,7 +356,7 @@
                         <button type="button" class="btn btn-secondary" onclick="openSettingsModal()">
                             ⚙️ Safe Thresholds (2°C - 8°C)
                         </button>
-                        <button type="button" class="btn btn-primary" onclick="markAllAcknowledged()">
+                        <button type="button" class="btn btn-primary" id="acknowledge-all-btn" onclick="markAllAcknowledged()">
                             ✓ Acknowledge All
                         </button>
                     </div>
@@ -565,7 +565,7 @@
 
                         <!-- Actions -->
                         <div style="display:flex; flex-direction:column; gap:10px;">
-                            <button type="button" class="btn btn-primary" style="width:100%; height:42px;"
+                        <button type="button" class="btn btn-primary" id="acknowledge-alert-btn" style="width:100%; height:42px;"
                                 onclick="acknowledgeAlert()">
                                 ✓ Acknowledge Alert
                             </button>
