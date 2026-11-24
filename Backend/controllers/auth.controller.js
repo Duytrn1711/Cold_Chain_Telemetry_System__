@@ -177,6 +177,111 @@ exports.listRegistrationRequests = async (req, res) => {
     }
 };
 
+// GET /api/auth/users - ADMIN only. Never return password hashes.
+exports.listUsers = async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, username, email, full_name, role, status, created_at
+            FROM users
+            ORDER BY created_at DESC NULLS LAST, id DESC
+        `);
+        return res.json({ success: true, data: result.rows, message: "Lấy danh sách tài khoản thành công" });
+    } catch (error) {
+        console.error("User management list error:", error.code || "unknown");
+        return res.status(500).json({ success: false, data: null, message: "Không thể tải danh sách tài khoản" });
+    }
+};
+
+// PATCH /api/auth/users/:id/role - ADMIN only
+exports.updateUserRole = async (req, res) => {
+    const requestedRole = String((req.body || {}).role || "").trim().toUpperCase();
+    const rawUserId = String(req.params.id || "");
+    if (!/^\d{1,19}$/.test(rawUserId) || BigInt(rawUserId) <= 0n || BigInt(rawUserId) > 9223372036854775807n || !["USER", "STAFF", "MANAGER", "ADMIN"].includes(requestedRole)) {
+        return res.status(400).json({ success: false, data: null, message: "Tài khoản hoặc vai trò không hợp lệ" });
+    }
+    const userId = BigInt(rawUserId).toString();
+    if (String(req.user.id) === userId) {
+        return res.status(409).json({ success: false, data: null, message: "Bạn không thể tự thay đổi vai trò của mình" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        await client.query("SELECT pg_advisory_xact_lock(91743022)");
+        const target = await client.query("SELECT id, role, status FROM users WHERE id = $1::BIGINT FOR UPDATE", [userId]);
+        if (!target.rowCount) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ success: false, data: null, message: "Không tìm thấy tài khoản" });
+        }
+        if (target.rows[0].status === "PENDING" && !["STAFF", "MANAGER"].includes(requestedRole)) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ success: false, data: null, message: "Yêu cầu đang chờ duyệt chỉ được gán vai trò Staff hoặc Manager" });
+        }
+        if (target.rows[0].role === "ADMIN" && target.rows[0].status === "ACTIVE" && requestedRole !== "ADMIN") {
+            const admins = await client.query("SELECT COUNT(*)::INT AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'");
+            if (admins.rows[0].count <= 1) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ success: false, data: null, message: "Không thể hạ quyền quản trị viên cuối cùng đang hoạt động" });
+            }
+        }
+        const updated = await client.query(`
+            UPDATE users SET role = $2::VARCHAR
+            WHERE id = $1::BIGINT
+            RETURNING id, username, email, full_name, role, status, created_at
+        `, [userId, requestedRole]);
+        await client.query("COMMIT");
+        return res.json({ success: true, data: updated.rows[0], message: "Đã cập nhật vai trò tài khoản" });
+    } catch (error) {
+        try { await client.query("ROLLBACK"); } catch {}
+        console.error("User role update error:", error.code || "unknown");
+        return res.status(500).json({ success: false, data: null, message: "Không thể cập nhật vai trò tài khoản" });
+    } finally {
+        client.release();
+    }
+};
+
+// DELETE /api/auth/users/:id - ADMIN only
+exports.deleteUser = async (req, res) => {
+    const rawUserId = String(req.params.id || "");
+    if (!/^\d{1,19}$/.test(rawUserId) || BigInt(rawUserId) <= 0n || BigInt(rawUserId) > 9223372036854775807n) {
+        return res.status(400).json({ success: false, data: null, message: "Mã tài khoản không hợp lệ" });
+    }
+    const userId = BigInt(rawUserId).toString();
+    if (String(req.user.id) === userId) {
+        return res.status(409).json({ success: false, data: null, message: "Bạn không thể xóa tài khoản đang đăng nhập" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        await client.query("SELECT pg_advisory_xact_lock(91743022)");
+        const target = await client.query("SELECT id, role, status FROM users WHERE id = $1::BIGINT FOR UPDATE", [userId]);
+        if (!target.rowCount) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ success: false, data: null, message: "Không tìm thấy tài khoản" });
+        }
+        if (target.rows[0].role === "ADMIN" && target.rows[0].status === "ACTIVE") {
+            const admins = await client.query("SELECT COUNT(*)::INT AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'");
+            if (admins.rows[0].count <= 1) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({ success: false, data: null, message: "Không thể xóa quản trị viên cuối cùng đang hoạt động" });
+            }
+        }
+        await client.query("DELETE FROM users WHERE id = $1::BIGINT", [userId]);
+        await client.query("COMMIT");
+        return res.json({ success: true, data: { id: userId }, message: "Đã xóa tài khoản" });
+    } catch (error) {
+        try { await client.query("ROLLBACK"); } catch {}
+        if (error.code === "23503") {
+            return res.status(409).json({ success: false, data: null, message: "Tài khoản đang được tham chiếu bởi dữ liệu khác và không thể xóa" });
+        }
+        console.error("User deletion error:", error.code || "unknown");
+        return res.status(500).json({ success: false, data: null, message: "Không thể xóa tài khoản" });
+    } finally {
+        client.release();
+    }
+};
+
 // PATCH /api/auth/users/:id/approval - ADMIN only
 exports.reviewRegistrationRequest = async (req, res) => {
     const decision = String((req.body || {}).decision || "").toUpperCase();
@@ -238,7 +343,7 @@ exports.getMe = async (req, res) => {
 };
 
 // Middleware verifyToken
-exports.verifyToken = (req, res, next) => {
+exports.verifyToken = async (req, res, next) => {
     const authHeader = req.headers["authorization"] || req.headers["Authorization"];
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({
@@ -252,9 +357,20 @@ exports.verifyToken = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
-        next();
+        const currentUser = await pool.query(
+            "SELECT role, status FROM users WHERE id = $1::BIGINT",
+            [decoded.id]
+        );
+        if (!currentUser.rowCount || currentUser.rows[0].status !== "ACTIVE") {
+            return res.status(401).json({ success: false, data: null, message: "Tài khoản không còn quyền truy cập. Hãy đăng nhập lại." });
+        }
+        req.user = { ...decoded, role: currentUser.rows[0].role };
+        return next();
     } catch (err) {
+        if (err.name !== "JsonWebTokenError" && err.name !== "TokenExpiredError" && err.name !== "NotBeforeError") {
+            console.error("Auth token database check failed:", err.code || "unknown");
+            return res.status(500).json({ success: false, data: null, message: "Không thể xác minh phiên đăng nhập" });
+        }
         return res.status(401).json({
             success: false,
             data: null,

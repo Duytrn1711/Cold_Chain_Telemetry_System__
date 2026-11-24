@@ -14,12 +14,16 @@
         .approval-header h2 { margin:0 0 6px; color:#0f172a; }
         .approval-header p { color:#64748b; }
         .approval-card { overflow:auto; border:1px solid #e2e8f0; border-radius:12px; background:#fff; }
-        .approval-table { width:100%; min-width:850px; border-collapse:collapse; }
+        .approval-table { width:100%; min-width:1120px; border-collapse:collapse; }
         .approval-table th,.approval-table td { padding:13px 15px; border-bottom:1px solid #e2e8f0; text-align:left; vertical-align:middle; }
         .approval-table th { background:#f8fafc; color:#64748b; font-size:11px; letter-spacing:.04em; }
         .approval-table td { color:#334155; font-size:13px; }
-        .approval-actions { display:flex; align-items:center; gap:8px; }
+        .approval-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .approval-role { min-height:34px; border:1px solid #cbd5e1; border-radius:6px; padding:4px 8px; }
+        .approval-status { display:inline-flex; border-radius:999px; padding:5px 9px; font-size:11px; font-weight:700; white-space:nowrap; }
+        .approval-status-active { background:#dcfce7; color:#15803d; }
+        .approval-status-pending { background:#eff6ff; color:#1d4ed8; }
+        .approval-status-rejected,.approval-status-inactive { background:#fee2e2; color:#b91c1c; }
         .approval-message { padding:30px; text-align:center; color:#64748b; }
         .btn-reject { background:#fff; color:#b91c1c; border:1px solid #fecaca; }
         @media(max-width:700px){.approval-content{padding:18px}.approval-header{display:block}}
@@ -31,8 +35,8 @@
         <div class="main-wrapper">
             <header class="top-header"><div class="header-left"><div class="page-title-group"><strong>Cold Chain · Quản lý tài khoản</strong></div></div><div class="header-right"><span class="badge badge-active">ADMIN</span></div></header>
             <main class="approval-content">
-                <div class="approval-header"><div><h2>Yêu cầu đăng ký tài khoản</h2><p>Chọn vai trò được cấp trước khi phê duyệt. Tài khoản chờ duyệt chưa thể đăng nhập.</p></div><button type="button" class="btn btn-secondary" id="refresh-requests">Làm mới</button></div>
-                <div class="approval-card"><table class="approval-table"><thead><tr><th>HỌ TÊN</th><th>TÊN ĐĂNG NHẬP</th><th>EMAIL</th><th>VAI TRÒ ĐỀ NGHỊ</th><th>NGÀY GỬI</th><th>THAO TÁC</th></tr></thead><tbody id="requests-body"><tr><td class="approval-message" colspan="6">Đang tải yêu cầu…</td></tr></tbody></table></div>
+                <div class="approval-header"><div><h2>Quản lý tài khoản</h2><p>Hiển thị mọi tài khoản. Admin có thể đổi vai trò, duyệt yêu cầu mới hoặc xóa tài khoản.</p></div><button type="button" class="btn btn-secondary" id="refresh-requests">Làm mới</button></div>
+                <div class="approval-card"><table class="approval-table"><thead><tr><th>HỌ TÊN</th><th>TÊN ĐĂNG NHẬP</th><th>EMAIL</th><th>VAI TRÒ</th><th>TRẠNG THÁI</th><th>NGÀY TẠO</th><th>THAO TÁC</th></tr></thead><tbody id="requests-body"><tr><td class="approval-message" colspan="7">Đang tải tài khoản…</td></tr></tbody></table></div>
             </main>
         </div>
     </div>

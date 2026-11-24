@@ -5,6 +5,9 @@ const authController = require("../controllers/auth.controller");
 // Route đăng nhập
 router.post("/login", authController.login);
 router.post("/register", authController.register);
+router.get("/users", authController.verifyToken, authController.requireMinRole("ADMIN"), authController.listUsers);
+router.patch("/users/:id/role", authController.verifyToken, authController.requireMinRole("ADMIN"), authController.updateUserRole);
+router.delete("/users/:id", authController.verifyToken, authController.requireMinRole("ADMIN"), authController.deleteUser);
 router.get("/registration-requests", authController.verifyToken, authController.requireMinRole("ADMIN"), authController.listRegistrationRequests);
 router.patch("/users/:id/approval", authController.verifyToken, authController.requireMinRole("ADMIN"), authController.reviewRegistrationRequest);
 

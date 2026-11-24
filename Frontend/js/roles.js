@@ -146,7 +146,7 @@ const Roles = {
                 <ul class="nav-list">
                     ${this.navItem("reports", this.href("reports"), "Reports")}
                     ${this.navItem("agri-batches", this.href("agri-batches"), "Agri Batch Logistics")}
-                    ${this.current() === "ADMIN" ? this.navItem("users", this.href("user-approvals"), "Account approvals") : ""}
+                    ${this.current() === "ADMIN" ? this.navItem("users", this.href("user-approvals"), "Account management") : ""}
                 </ul>
             </nav>
             <div class="sidebar-footer">
