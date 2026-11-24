@@ -6,7 +6,8 @@
  * Fully synchronized in English.
  */
 
-let audioAlertEnabled = true;
+let audioAlertEnabled = localStorage.getItem("cfg_audio_alert") !== "false";
+let alertAudioContext = null;
 const knownNotificationAlertIds = new Set();
 let notificationAlertsSeeded = false;
 const alertToastTimesByDevice = new Map();
@@ -24,6 +25,8 @@ document.addEventListener("DOMContentLoaded", () => {
     initSettingsModal();
     initChangePasswordModal();
     initAutoRefresh();
+    document.addEventListener("pointerdown", unlockAlertAudio, { once: true });
+    document.addEventListener("keydown", unlockAlertAudio, { once: true });
 });
 
 // --- 1. DOM INJECTION FOR GLOBAL MODALS & MENUS ---
@@ -244,22 +247,39 @@ function updateNavAlertBadge(delta = 1) {
 function playAlertSound() {
     if (!audioAlertEnabled) return;
     try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.3);
+        if (!alertAudioContext || alertAudioContext.state !== "running") return;
+        const ctx = alertAudioContext;
+        [0, 0.28, 0.56].forEach((offset) => {
+            const oscillator = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const start = ctx.currentTime + offset;
+            oscillator.connect(gain);
+            gain.connect(ctx.destination);
+            oscillator.type = "sawtooth";
+            oscillator.frequency.setValueAtTime(950, start);
+            oscillator.frequency.exponentialRampToValueAtTime(560, start + 0.2);
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.exponentialRampToValueAtTime(0.32, start + 0.025);
+            gain.gain.setValueAtTime(0.28, start + 0.16);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.23);
+            oscillator.start(start);
+            oscillator.stop(start + 0.24);
+        });
     } catch (e) {}
 }
+
+async function unlockAlertAudio() {
+    if (!audioAlertEnabled || alertAudioContext?.state === "running") return;
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        alertAudioContext ||= new AudioCtx();
+        await alertAudioContext.resume();
+        const button = document.getElementById("enable-alert-sound");
+        if (button && alertAudioContext.state === "running") button.textContent = "Âm thanh cảnh báo đã bật";
+    } catch (e) {}
+}
+window.enableAlertAudio = unlockAlertAudio;
 
 window.triggerExcursionAlarmSound = playAlertSound;
 
@@ -339,6 +359,7 @@ function initNotificationsDrawer() {
             </div>
             <span style="font-size:11px; color:#64748b;">Cảnh báo và lô hàng mới</span>
         </div>
+        <button type="button" id="enable-alert-sound" onclick="enableAlertAudio()" style="margin:8px 14px 2px;padding:7px 10px;border:1px solid #fecaca;border-radius:8px;background:#fff1f2;color:#b91c1c;font-weight:700;cursor:pointer;">🔊 Bật âm thanh cảnh báo</button>
         <div class="notification-list" id="notification-items-list"><div style="padding:24px;text-align:center;color:#64748b">Đang tải thông báo…</div></div>
         <div style="padding:10px 16px; background:#f8fafc; border-top:1px solid #e2e8f0; text-align:center;">
             <a href="#" style="font-size:12px; font-weight:700; color:#2563eb; text-decoration:none;" data-notification-nav="batches">Mở trang Agri Batch Logistics →</a>
@@ -346,7 +367,7 @@ function initNotificationsDrawer() {
     `;
     wrapper.appendChild(menu);
     loadNotificationAlerts();
-    window.setInterval(loadNotificationAlerts, 4000);
+    window.setInterval(loadNotificationAlerts, 2000);
 
     notifBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -477,6 +498,16 @@ async function loadNotificationAlerts() {
         } else {
             const newAlerts = identifiedAlerts.filter((alert) => !knownNotificationAlertIds.has(String(alert.id)));
             newAlerts.forEach((alert) => knownNotificationAlertIds.add(String(alert.id)));
+            const alarmDevices = new Set();
+            newAlerts.forEach((alert) => {
+                const deviceKey = String(alert.device_id || alert.device_token || "system");
+                const lastAlarmAt = alertToastTimesByDevice.get(`sound:${deviceKey}`) || 0;
+                if (Date.now() - lastAlarmAt >= 30000) {
+                    alertToastTimesByDevice.set(`sound:${deviceKey}`, Date.now());
+                    alarmDevices.add(deviceKey);
+                }
+            });
+            if (alarmDevices.size) playAlertSound();
             if (newAlerts.length && typeof showToast === "function") {
                 const newest = newAlerts[0];
                 const pageHasLocalTelemetryAlert = /\/(data|devices-detail)\.html$/.test(window.location.pathname);

@@ -1,7 +1,9 @@
 const crypto = require("crypto");
 const pool = require("../db");
 
-const DEFAULT_INTERVAL_MS = 5_000;
+const DEFAULT_INTERVAL_MS = 3_000;
+const MIN_INTERVAL_MS = 2_000;
+const MAX_INTERVAL_MS = 5_000;
 let timer;
 let running = false;
 let cachedAccessToken = null;
@@ -188,18 +190,23 @@ async function pollOnce() {
     try {
         const batches = await getAgriBatches({ baseUrl, identifier, password });
         const summary = { imported: 0, decisions: 0, existing: 0, invalid: 0, failed: 0 };
-        for (const batch of batches) {
-            try {
-                const result = await syncOneBatch(batch);
-                if (result === "imported") summary.imported += 1;
-                else if (result === "decision") summary.decisions += 1;
-                else if (result === "invalid") summary.invalid += 1;
-                else summary.existing += 1;
-            } catch (error) {
-                summary.failed += 1;
-                console.error("Agri-Audit batch sync failed:", error.code || error.status || "unknown");
+        let nextIndex = 0;
+        const workerCount = Math.min(8, batches.length);
+        await Promise.all(Array.from({ length: workerCount }, async () => {
+            while (nextIndex < batches.length) {
+                const batch = batches[nextIndex++];
+                try {
+                    const result = await syncOneBatch(batch);
+                    if (result === "imported") summary.imported += 1;
+                    else if (result === "decision") summary.decisions += 1;
+                    else if (result === "invalid") summary.invalid += 1;
+                    else summary.existing += 1;
+                } catch (error) {
+                    summary.failed += 1;
+                    console.error("Agri-Audit batch sync failed:", error.code || error.status || "unknown");
+                }
             }
-        }
+        }));
         if (summary.imported || summary.decisions || summary.invalid || summary.failed) {
             console.info("Agri-Audit polling completed:", summary);
         }
@@ -212,8 +219,11 @@ async function pollOnce() {
 
 function startAgriAuditPoller() {
     const configured = Number.parseInt(process.env.AGRI_AUDIT_POLL_INTERVAL_MS || `${DEFAULT_INTERVAL_MS}`, 10);
-    const interval = Number.isFinite(configured) && configured >= 15_000 ? configured : DEFAULT_INTERVAL_MS;
+    const interval = Number.isFinite(configured)
+        ? Math.max(MIN_INTERVAL_MS, Math.min(MAX_INTERVAL_MS, configured))
+        : DEFAULT_INTERVAL_MS;
     if (timer) clearInterval(timer);
+    console.info(`Agri-Audit synchronization enabled (every ${interval} ms; up to 8 batches in parallel)`);
     void pollOnce();
     timer = setInterval(pollOnce, interval);
     timer.unref?.();

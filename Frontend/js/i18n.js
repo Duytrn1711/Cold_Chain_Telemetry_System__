@@ -237,6 +237,7 @@
         ["Xe đang đến lấy hàng", "Vehicle en route to farmer"], ["Đã lấy hàng · đang về kho", "Picked up · returning to warehouse"],
         ["Đã đến điểm kiểm định", "Arrived at inspection point"], ["Đạt kiểm định · chờ giao", "Approved · awaiting delivery"],
         ["Không đạt · chờ hoàn hàng", "Rejected · awaiting return"],
+        ["🔊 Bật âm thanh cảnh báo", "🔊 Enable alert sound"], ["Âm thanh cảnh báo đã bật", "Alert sound enabled"],
         ["Currently in transit", "Đang vận chuyển"], ["Loading…", "Đang tải…"], ["Loading shipments…", "Đang tải lô hàng…"],
         ["No shipments are currently in transit.", "Hiện không có lô hàng nào đang vận chuyển."], ["BATCH / PRODUCT", "MÃ LÔ / SẢN PHẨM"],
         ["QUANTITY", "SỐ LƯỢNG"], ["STATUS", "TRẠNG THÁI"], ["VEHICLE", "XE"], ["ROUTE", "LỘ TRÌNH"],
