@@ -1,6 +1,6 @@
 const approvalSafe = (value) => String(value ?? "—").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
-const approvalRoles = ["USER", "STAFF", "MANAGER", "ADMIN"];
-const approvalRoleLabel = (role) => ({ USER: "User", STAFF: "Staff", MANAGER: "Manager", ADMIN: "Admin" }[role] || role);
+const approvalRoles = ["USER", "STAFF", "ADMIN"];
+const approvalRoleLabel = (role) => ({ USER: "User", STAFF: "Staff", ADMIN: "Admin" }[role] || role);
 
 document.addEventListener("DOMContentLoaded", async () => {
     if (!window.Roles || Roles.current() !== "ADMIN") {
@@ -30,7 +30,7 @@ async function loadManagedUsers() {
             const status = String(user.status || "UNKNOWN").toUpperCase();
             const isPending = status === "PENDING";
             const isSelf = userId === currentUserId;
-            const options = [...new Set([...(isPending ? ["STAFF", "MANAGER"] : approvalRoles), role])].map((option) =>
+            const options = [...new Set([...(isPending ? ["USER", "STAFF"] : approvalRoles), role])].map((option) =>
                 `<option value="${approvalSafe(option)}" ${role === option ? "selected" : ""}>${approvalSafe(approvalRoleLabel(option))}</option>`
             ).join("");
             const statusClass = status === "ACTIVE" ? "active" : status === "PENDING" ? "pending" : status === "REJECTED" || status === "INACTIVE" ? "rejected" : "";

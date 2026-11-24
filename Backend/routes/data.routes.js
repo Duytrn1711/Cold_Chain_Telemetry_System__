@@ -4,10 +4,10 @@ const dataController = require("../controllers/data.controller");
 const authController = require("../controllers/auth.controller");
 const { verifyToken, requireMinRole } = authController;
 
-router.get("/summary", dataController.getSummary);
-router.get("/reports", dataController.getReportsData);
-router.get("/", dataController.getAllData);
-router.get("/device/:deviceId", dataController.getDeviceData);
-router.post("/", verifyToken, requireMinRole("MANAGER"), dataController.createData);
+router.get("/summary", verifyToken, requireMinRole("STAFF"), dataController.getSummary);
+router.get("/reports", verifyToken, requireMinRole("STAFF"), dataController.getReportsData);
+router.get("/", verifyToken, requireMinRole("STAFF"), dataController.getAllData);
+router.get("/device/:deviceId", verifyToken, requireMinRole("STAFF"), dataController.getDeviceData);
+router.post("/", verifyToken, requireMinRole("STAFF"), dataController.createData);
 
 module.exports = router;

@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     showToast("Signed in successfully! Redirecting...", "success");
                     setTimeout(() => {
-                        window.location.href = "dashboard.html";
+                        window.location.href = response.data.user.role === "USER" ? "pages/tracking.html" : "dashboard.html";
                     }, 500);
                 } else {
                     if (errorAlert) {
@@ -164,6 +164,14 @@ function initProtectedPage() {
         const isSubpage = window.location.pathname.includes("/pages/");
         window.location.href = isSubpage ? "../login.html" : "login.html";
         return;
+    }
+
+    if (window.Roles && Roles.current() === "USER") {
+        const isTrackingPage = window.location.pathname.toLowerCase().endsWith("/pages/tracking.html");
+        if (!isTrackingPage) {
+            window.location.replace(window.location.pathname.includes("/pages/") ? "tracking.html" : "pages/tracking.html");
+            return;
+        }
     }
 
     if (window.Roles) {

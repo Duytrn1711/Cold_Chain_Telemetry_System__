@@ -8,6 +8,13 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
 }
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
+function canonicalRole(role) {
+    const normalized = String(role || "USER").trim().toUpperCase();
+    if (normalized === "ADMIN") return "ADMIN";
+    if (["STAFF", "MANAGER", "OPERATOR"].includes(normalized)) return "STAFF";
+    return "USER";
+}
+
 // POST /api/auth/login
 exports.login = async (req, res) => {
     try {
@@ -77,7 +84,7 @@ exports.login = async (req, res) => {
             id: user.id,
             username: user.username,
             full_name: user.full_name,
-            role: user.role
+            role: canonicalRole(user.role)
         };
 
         const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -90,7 +97,7 @@ exports.login = async (req, res) => {
                     id: user.id,
                     username: user.username,
                     full_name: user.full_name,
-                    role: user.role,
+                    role: canonicalRole(user.role),
                     status: user.status
                 }
             },
@@ -118,11 +125,11 @@ exports.register = async (req, res) => {
 
     if (fullName.length < 2 || fullName.length > 255 || username.length < 3 || username.length > 100 ||
         !emailPattern.test(email) || email.length > 255 || password.length < 10 || password.length > 128 ||
-        !["STAFF", "MANAGER"].includes(role)) {
+        !["STAFF", "USER"].includes(role)) {
         return res.status(400).json({
             success: false,
             data: null,
-            message: "Vui lòng nhập họ tên, username, email hợp lệ, mật khẩu từ 10 ký tự và vai trò Staff hoặc Manager"
+            message: "Vui lòng nhập họ tên, username, email hợp lệ, mật khẩu từ 10 ký tự và chọn Nhân viên hoặc Người dùng"
         });
     }
 
@@ -181,7 +188,9 @@ exports.listRegistrationRequests = async (req, res) => {
 exports.listUsers = async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT id, username, email, full_name, role, status, created_at
+            SELECT id, username, email, full_name,
+                CASE WHEN UPPER(role) IN ('MANAGER','OPERATOR') THEN 'STAFF' ELSE UPPER(role) END AS role,
+                status, created_at
             FROM users
             ORDER BY created_at DESC NULLS LAST, id DESC
         `);
@@ -196,7 +205,7 @@ exports.listUsers = async (req, res) => {
 exports.updateUserRole = async (req, res) => {
     const requestedRole = String((req.body || {}).role || "").trim().toUpperCase();
     const rawUserId = String(req.params.id || "");
-    if (!/^\d{1,19}$/.test(rawUserId) || BigInt(rawUserId) <= 0n || BigInt(rawUserId) > 9223372036854775807n || !["USER", "STAFF", "MANAGER", "ADMIN"].includes(requestedRole)) {
+    if (!/^\d{1,19}$/.test(rawUserId) || BigInt(rawUserId) <= 0n || BigInt(rawUserId) > 9223372036854775807n || !["USER", "STAFF", "ADMIN"].includes(requestedRole)) {
         return res.status(400).json({ success: false, data: null, message: "Tài khoản hoặc vai trò không hợp lệ" });
     }
     const userId = BigInt(rawUserId).toString();
@@ -213,9 +222,9 @@ exports.updateUserRole = async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(404).json({ success: false, data: null, message: "Không tìm thấy tài khoản" });
         }
-        if (target.rows[0].status === "PENDING" && !["STAFF", "MANAGER"].includes(requestedRole)) {
+        if (target.rows[0].status === "PENDING" && !["STAFF", "USER"].includes(requestedRole)) {
             await client.query("ROLLBACK");
-            return res.status(400).json({ success: false, data: null, message: "Yêu cầu đang chờ duyệt chỉ được gán vai trò Staff hoặc Manager" });
+            return res.status(400).json({ success: false, data: null, message: "Tài khoản chờ duyệt chỉ được gán vai trò Nhân viên hoặc Người dùng" });
         }
         if (target.rows[0].role === "ADMIN" && target.rows[0].status === "ACTIVE" && requestedRole !== "ADMIN") {
             const admins = await client.query("SELECT COUNT(*)::INT AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'");
@@ -286,7 +295,7 @@ exports.deleteUser = async (req, res) => {
 exports.reviewRegistrationRequest = async (req, res) => {
     const decision = String((req.body || {}).decision || "").toUpperCase();
     const requestedRole = String((req.body || {}).role || "").toUpperCase();
-    if (!["APPROVE", "REJECT"].includes(decision) || (decision === "APPROVE" && !["STAFF", "MANAGER"].includes(requestedRole))) {
+    if (!["APPROVE", "REJECT"].includes(decision) || (decision === "APPROVE" && !["STAFF", "USER"].includes(requestedRole))) {
         return res.status(400).json({ success: false, data: null, message: "Quyết định hoặc vai trò phê duyệt không hợp lệ" });
     }
 
@@ -315,7 +324,7 @@ exports.getMe = async (req, res) => {
     try {
         const userId = req.user.id;
         const result = await pool.query(
-            "SELECT id, username, full_name, role, status, created_at FROM users WHERE id = $1",
+            "SELECT id, username, full_name, status, created_at FROM users WHERE id = $1",
             [userId]
         );
 
@@ -329,7 +338,7 @@ exports.getMe = async (req, res) => {
 
         return res.json({
             success: true,
-            data: result.rows[0],
+            data: { ...result.rows[0], role: canonicalRole(req.user.role) },
             message: "Lấy thông tin người dùng thành công"
         });
     } catch (error) {
@@ -364,7 +373,7 @@ exports.verifyToken = async (req, res, next) => {
         if (!currentUser.rowCount || currentUser.rows[0].status !== "ACTIVE") {
             return res.status(401).json({ success: false, data: null, message: "Tài khoản không còn quyền truy cập. Hãy đăng nhập lại." });
         }
-        req.user = { ...decoded, role: currentUser.rows[0].role };
+        req.user = { ...decoded, role: canonicalRole(currentUser.rows[0].role) };
         return next();
     } catch (err) {
         if (err.name !== "JsonWebTokenError" && err.name !== "TokenExpiredError" && err.name !== "NotBeforeError") {
@@ -379,13 +388,13 @@ exports.verifyToken = async (req, res, next) => {
     }
 };
 
-const ROLE_RANK = { STAFF: 1, USER: 1, OPERATOR: 1, MANAGER: 2, ADMIN: 3 };
+const ROLE_RANK = { USER: 1, STAFF: 2, MANAGER: 2, OPERATOR: 2, ADMIN: 3 };
 
 exports.requireMinRole = (minRole) => {
     return (req, res, next) => {
-        const raw = String((req.user && req.user.role) || "STAFF").toUpperCase();
+        const raw = canonicalRole((req.user && req.user.role) || "USER");
         const userRank = ROLE_RANK[raw] || 1;
-        const needed = ROLE_RANK[String(minRole).toUpperCase()] || 3;
+        const needed = ROLE_RANK[canonicalRole(minRole)] || 3;
         if (userRank < needed) {
             return res.status(403).json({
                 success: false,

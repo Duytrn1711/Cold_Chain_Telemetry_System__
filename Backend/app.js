@@ -16,6 +16,8 @@ const dataRoutes = require("./routes/data.routes");
 const alertRoutes = require("./routes/alert.routes");
 const agriBatchRoutes = require("./routes/agri-batch.routes");
 const arduinoRoutes = require("./routes/arduino.routes");
+const trackingRoutes = require("./routes/tracking.routes");
+const authController = require("./controllers/auth.controller");
 const { startAgriAuditPoller } = require("./services/agri-audit-poller");
 const { startTelemetrySimulator } = require("./services/telemetry-simulator");
 
@@ -41,7 +43,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // Test PostgreSQL Database
-app.get("/api/test-db", async (req, res) => {
+app.get("/api/test-db", authController.verifyToken, authController.requireMinRole("ADMIN"), async (req, res) => {
     try {
         const result = await pool.query("SELECT NOW() AS current_time");
         res.json({
@@ -67,6 +69,7 @@ app.use("/api/devices", deviceRoutes);
 app.use("/api/data", dataRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/agri-batches", agriBatchRoutes);
+app.use("/api/tracking", trackingRoutes);
 app.use("/api/integrations/agri/batches", agriBatchRoutes);
 app.use("/api/integrations/arduino", arduinoRoutes);
 
