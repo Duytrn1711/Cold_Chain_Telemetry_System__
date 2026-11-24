@@ -35,6 +35,10 @@ async function loadWarehouses() {
             const totalEl = document.getElementById("wh-total-count");
             if (totalEl) totalEl.textContent = allWarehouses.length;
 
+            const onlineCount = allWarehouses.filter((warehouse) => Number(warehouse.online_device_count) > 0).length;
+            const onlineEl = document.getElementById("wh-online-count");
+            if (onlineEl) onlineEl.textContent = onlineCount;
+
             const badgeCount = document.getElementById("wh-badge-count");
             if (badgeCount) badgeCount.textContent = `${allWarehouses.length} Facilities`;
 

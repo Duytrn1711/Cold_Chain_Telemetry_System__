@@ -143,7 +143,7 @@ const Roles = {
                     ${this.navItem("vehicles", this.href("vehicles"), "Delivery Vehicles")}
                     ${this.navItem("devices", this.href("devices"), "Devices")}
                     ${this.navItem("data", this.href("data"), "Telemetry Data")}
-                    ${this.navItem("alerts", this.href("alerts"), "Alerts", '<span class="nav-badge" id="nav-alert-count">3</span>')}
+                    ${this.navItem("alerts", this.href("alerts"), "Alerts", '<span class="nav-badge" id="nav-alert-count" hidden>0</span>')}
                 </ul>
                 <div class="nav-section-title">MANAGEMENT</div>
                 <ul class="nav-list">

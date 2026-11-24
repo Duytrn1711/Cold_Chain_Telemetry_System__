@@ -16,15 +16,24 @@ exports.getAllWarehouses = async (req, res) => {
                 w.created_at,
                 COUNT(DISTINCT v.id) AS vehicle_count,
                 COUNT(DISTINCT d.id) AS device_count,
-                ROUND(AVG(dt.temperature), 1) AS avg_temp
+                ROUND(AVG(dt.temperature), 1) AS avg_temp,
+                COUNT(DISTINCT d.id) FILTER (
+                    WHERE d.status = 'ACTIVE'
+                      AND dt.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 seconds'
+                ) AS online_device_count
             FROM warehouse w
             LEFT JOIN delivery_vehicle v ON v.warehouse_id = w.id
             LEFT JOIN device d ON d.warehouse_id = w.id
-            LEFT JOIN (
-                SELECT DISTINCT ON (device_id) device_id, temperature 
-                FROM data 
-                ORDER BY device_id, created_at DESC
-            ) dt ON dt.device_id = d.id
+            LEFT JOIN LATERAL (
+                SELECT temperature, created_at
+                FROM (
+                    SELECT temperature, created_at FROM data WHERE device_id = d.id
+                    UNION ALL
+                    SELECT temperature, created_at FROM telemetry_simulation WHERE device_id = d.id
+                ) readings
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) dt ON TRUE
             WHERE 1=1
         `;
         const params = [];

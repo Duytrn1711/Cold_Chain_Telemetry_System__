@@ -1,5 +1,19 @@
 const pool = require("../db");
 
+// GET /api/alerts/summary - current unresolved alert count for the navigation badge.
+exports.getAlertSummary = async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT COUNT(*) FILTER (WHERE status IS DISTINCT FROM 'RESOLVED')::INT AS active_count
+            FROM alert
+        `);
+        return res.json({ success: true, data: { active_count: result.rows[0].active_count } });
+    } catch (error) {
+        console.error("Alert summary error:", error.code || "unknown");
+        return res.status(500).json({ success: false, data: null, message: "Không thể tải tổng số cảnh báo" });
+    }
+};
+
 // GET /api/alerts - Lấy danh sách sự cố và cảnh báo
 exports.getAllAlerts = async (req, res) => {
     try {

@@ -236,11 +236,12 @@ function injectEnhancedUI() {
 }
 
 // --- 2. ALERT BADGE & AUDIO UTILITIES ---
-function updateNavAlertBadge(delta = 1) {
-    const badge = document.getElementById("nav-alert-count") || document.querySelector(".nav-badge");
+function updateNavAlertBadge(count = 0) {
+    const badge = document.getElementById("nav-alert-count");
     if (badge) {
-        const current = parseInt(badge.textContent || "3", 10);
-        badge.textContent = Math.max(0, current + delta);
+        const activeCount = Math.max(0, Number(count) || 0);
+        badge.textContent = String(activeCount);
+        badge.hidden = activeCount === 0;
     }
 }
 
@@ -488,9 +489,19 @@ async function loadNotificationAlerts() {
     loadNotificationAlerts.running = true;
     const safe = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     let alerts = [];
+    let activeAlertCount = 0;
     try {
-        const response = await api.get("/alerts");
+        const [alertsResult, summaryResult] = await Promise.allSettled([
+            api.get("/alerts"),
+            api.get("/alerts/summary")
+        ]);
+        if (alertsResult.status === "rejected") throw alertsResult.reason;
+        const response = alertsResult.value;
+        const summaryResponse = summaryResult.status === "fulfilled" ? summaryResult.value : null;
         alerts = Array.isArray(response.data) ? response.data : (Array.isArray(response.data?.list) ? response.data.list : []);
+        activeAlertCount = summaryResponse?.success
+            ? Number(summaryResponse.data?.active_count || 0)
+            : alerts.filter((alert) => alert.status !== "RESOLVED").length;
         const identifiedAlerts = alerts.filter((alert) => alert.id !== undefined && alert.id !== null);
         if (!notificationAlertsSeeded) {
             identifiedAlerts.forEach((alert) => knownNotificationAlertIds.add(String(alert.id)));
@@ -525,10 +536,10 @@ async function loadNotificationAlerts() {
 
     const batchNotifications = readBatchNotifications();
     const unreadBatches = batchNotifications.filter((item) => !item.read).length;
-    const activeAlerts = alerts.filter((alert) => alert.status !== "RESOLVED");
-    if (badge) badge.textContent = String(activeAlerts.length + unreadBatches);
+    if (badge) badge.textContent = String(activeAlertCount + unreadBatches);
+    updateNavAlertBadge(activeAlertCount);
     const headerDot = document.querySelector(".header-action-btn .header-badge-dot");
-    if (headerDot) headerDot.style.display = activeAlerts.length + unreadBatches ? "block" : "none";
+    if (headerDot) headerDot.style.display = activeAlertCount + unreadBatches ? "block" : "none";
 
     const batchItems = batchNotifications.slice(0, 10).map((item) => `
         <div class="notification-item ${item.read ? "" : "unread"}" data-notification-kind="batch" data-batch-code="${safe(item.batchCode)}">
