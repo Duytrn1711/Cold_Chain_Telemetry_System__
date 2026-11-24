@@ -57,12 +57,18 @@ try {
             $humidityProperty = $packet.PSObject.Properties['humidity']
             $humidity = if ($humidityProperty -and $null -ne $humidityProperty.Value) { [double]$humidityProperty.Value } else { 0 }
             $body = @{ temperature = $temperature; humidity = $humidity }
+            $batteryProperty = $packet.PSObject.Properties['battery_percent']
+            if ($batteryProperty -and $null -ne $batteryProperty.Value) { $body.battery_percent = [double]$batteryProperty.Value }
+            $speedProperty = $packet.PSObject.Properties['speed_kmh']
+            if ($speedProperty -and $null -ne $speedProperty.Value) { $body.speed_kmh = [double]$speedProperty.Value }
             if (-not [string]::IsNullOrWhiteSpace($DeviceToken)) { $body.device_token = $DeviceToken }
 
             $response = Invoke-RestMethod -Uri $ApiUrl -Method Post -Headers @{ 'x-arduino-token' = $apiToken } `
                 -ContentType 'application/json' -Body ($body | ConvertTo-Json -Compress) -TimeoutSec 10
             if (-not $response.success) { throw 'Cold Chain did not accept the telemetry packet.' }
-            Write-Host ("Stored telemetry: {0} °C (raw {1} °C, offset {2} °C), {3}% RH" -f $temperature, $rawTemperature, $TemperatureOffset, $humidity)
+            $batteryText = if ($null -ne $body.battery_percent) { "{0}% battery" -f $body.battery_percent } else { "battery unavailable" }
+            $speedText = if ($null -ne $body.speed_kmh) { "{0} km/h" -f $body.speed_kmh } else { "speed unavailable" }
+            Write-Host ("Stored telemetry: {0} °C (raw {1} °C, offset {2} °C), {3}% RH, {4}, {5}" -f $temperature, $rawTemperature, $TemperatureOffset, $humidity, $batteryText, $speedText)
         } catch {
             Write-Warning 'Skipped one serial line or failed to submit one packet. Check the Arduino JSON output and Cold Chain API settings.'
         }

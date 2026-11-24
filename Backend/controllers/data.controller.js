@@ -223,11 +223,15 @@ exports.getDeviceData = async (req, res) => {
 exports.createData = async (req, res) => {
     try {
         const { device_id, temperature, humidity } = req.body;
+        const batteryPercent = req.body.battery_percent === undefined || req.body.battery_percent === null || req.body.battery_percent === "" ? null : Number(req.body.battery_percent);
+        const speedKmh = req.body.speed_kmh === undefined || req.body.speed_kmh === null || req.body.speed_kmh === "" ? null : Number(req.body.speed_kmh);
 
         const tempValue = Number(temperature);
         const humidityValue = humidity === undefined || humidity === null || humidity === "" ? null : Number(humidity);
         if (!device_id || temperature === undefined || !Number.isFinite(tempValue) || tempValue < -100 || tempValue > 100 ||
-            (humidityValue !== null && (!Number.isFinite(humidityValue) || humidityValue < 0 || humidityValue > 100))) {
+            (humidityValue !== null && (!Number.isFinite(humidityValue) || humidityValue < 0 || humidityValue > 100)) ||
+            (batteryPercent !== null && (!Number.isFinite(batteryPercent) || batteryPercent < 0 || batteryPercent > 100)) ||
+            (speedKmh !== null && (!Number.isFinite(speedKmh) || speedKmh < 0 || speedKmh > 250))) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -243,10 +247,10 @@ exports.createData = async (req, res) => {
                 const nextId = Number(maxIdRes.rows[0].next_id) + attempt;
 
                 const insertRes = await pool.query(`
-                    INSERT INTO data (id, device_id, temperature, humidity, created_at)
-                    VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+                    INSERT INTO data (id, device_id, temperature, humidity, battery_percent, speed_kmh, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
                     RETURNING *
-                `, [nextId, device_id, tempValue, humidityValue]);
+                `, [nextId, device_id, tempValue, humidityValue, batteryPercent, speedKmh]);
                 record = insertRes.rows[0];
                 break;
             } catch (err) {

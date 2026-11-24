@@ -20,7 +20,7 @@ async function loadVehicles({ quiet = false } = {}) {
         const res = await api.get("/vehicles");
         if (res.success && res.data) {
             const previous = allVehicles.find((vehicle) => vehicle.id == selectedVehicleId);
-            const previousRouteState = previous ? `${previous.active_batch_code || ""}:${previous.shipment_status || ""}:${previous.device_is_online}:${previous.temperature}:${previous.humidity}` : "";
+            const previousRouteState = previous ? `${previous.active_batch_code || ""}:${previous.shipment_status || ""}:${previous.device_is_online}:${previous.temperature}:${previous.humidity}:${previous.battery_percent}:${previous.speed_kmh}` : "";
             allVehicles = res.data;
             const countEl = document.getElementById("count-all-fleet");
             if (countEl) countEl.textContent = allVehicles.length;
@@ -32,7 +32,7 @@ async function loadVehicles({ quiet = false } = {}) {
             // Select active or first vehicle by default
             if (allVehicles.length > 0) {
                 const target = selectedVehicleId ? (allVehicles.find(v => v.id == selectedVehicleId) || allVehicles[0]) : allVehicles[0];
-                const routeState = `${target.active_batch_code || ""}:${target.shipment_status || ""}:${target.device_is_online}:${target.temperature}:${target.humidity}`;
+                const routeState = `${target.active_batch_code || ""}:${target.shipment_status || ""}:${target.device_is_online}:${target.temperature}:${target.humidity}:${target.battery_percent}:${target.speed_kmh}`;
                 if (!selectedVehicleId || routeState !== previousRouteState) await selectVehicle(target.id);
             }
         }
@@ -185,7 +185,22 @@ async function selectVehicle(id) {
         const humSub = document.getElementById("v-stat-hum-sub");
         const nodeStat = document.getElementById("v-stat-node");
         const nodeSub = document.getElementById("v-stat-node-sub");
+        const batteryStat = document.getElementById("v-stat-battery");
+        const batterySub = document.getElementById("v-stat-battery-sub");
+        const speedStat = document.getElementById("v-stat-speed");
+        const speedSub = document.getElementById("v-stat-speed-sub");
         const statusBadge = document.getElementById("v-detail-status-badge");
+
+        const battery = device?.is_online && device.battery_percent != null ? Number(device.battery_percent) : null;
+        if (batteryStat) batteryStat.textContent = battery == null ? "Not recorded" : `${battery.toFixed(0)}%`;
+        if (batterySub) batterySub.textContent = battery == null
+            ? (device?.is_online ? "Sensor has not sent battery level" : "No live battery telemetry")
+            : (device.is_simulated ? "Simulated sensor reading" : "Live sensor reading");
+        const speed = isMovingShipment && device?.is_online && device.speed_kmh != null ? Number(device.speed_kmh) : null;
+        if (speedStat) speedStat.textContent = speed == null ? "Not recorded" : `${speed.toFixed(1)} km/h`;
+        if (speedSub) speedSub.textContent = !isMovingShipment
+            ? "Speed appears during transport"
+            : speed == null ? "No live speed reading" : (device.is_simulated ? "Simulated vehicle speed" : "Live vehicle speed");
 
         if (reading && reading.temperature !== null && device?.is_online && isMovingShipment) {
             const tempVal = parseFloat(reading.temperature);

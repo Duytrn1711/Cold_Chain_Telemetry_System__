@@ -19,6 +19,8 @@ exports.getAllVehicles = async (req, res) => {
                 sensor.device_status,
                 sensor.temperature,
                 sensor.humidity,
+                sensor.battery_percent,
+                sensor.speed_kmh,
                 sensor.last_ping_time,
                 sensor.is_simulated AS device_is_simulated,
                 shipment.external_batch_code AS active_batch_code,
@@ -36,13 +38,14 @@ exports.getAllVehicles = async (req, res) => {
             LEFT JOIN warehouse w ON v.warehouse_id = w.id
             LEFT JOIN LATERAL (
                 SELECT d.id AS device_id, d.device_token, d.status AS device_status,
-                    latest.temperature, latest.humidity, latest.created_at AS last_ping_time, latest.is_simulated
+                    latest.temperature, latest.humidity, latest.battery_percent, latest.speed_kmh,
+                    latest.created_at AS last_ping_time, latest.is_simulated
                 FROM device d
                 LEFT JOIN LATERAL (
-                    SELECT temperature, humidity, created_at, is_simulated FROM (
-                        SELECT temperature, humidity, created_at, FALSE AS is_simulated FROM data WHERE device_id = d.id
+                    SELECT temperature, humidity, battery_percent, speed_kmh, created_at, is_simulated FROM (
+                        SELECT temperature, humidity, battery_percent, speed_kmh, created_at, FALSE AS is_simulated FROM data WHERE device_id = d.id
                         UNION ALL
-                        SELECT temperature, humidity, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id = d.id
+                        SELECT temperature, humidity, battery_percent, speed_kmh, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id = d.id
                     ) readings
                     ORDER BY created_at DESC, is_simulated DESC LIMIT 1
                 ) latest ON TRUE
@@ -171,14 +174,15 @@ exports.getVehicleById = async (req, res) => {
         // Lấy tất cả thiết bị gán trên xe
         const deviceRes = await pool.query(`
             SELECT d.id, d.device_token, d.status, d.created_at,
-                latest.temperature, latest.humidity, latest.created_at AS last_reading_time, latest.is_simulated
+                latest.temperature, latest.humidity, latest.battery_percent, latest.speed_kmh,
+                latest.created_at AS last_reading_time, latest.is_simulated
             FROM device d
             LEFT JOIN LATERAL (
-                SELECT temperature, humidity, created_at, is_simulated
+                SELECT temperature, humidity, battery_percent, speed_kmh, created_at, is_simulated
                 FROM (
-                    SELECT temperature, humidity, created_at, FALSE AS is_simulated FROM data WHERE device_id = d.id
+                    SELECT temperature, humidity, battery_percent, speed_kmh, created_at, FALSE AS is_simulated FROM data WHERE device_id = d.id
                     UNION ALL
-                    SELECT temperature, humidity, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id = d.id
+                    SELECT temperature, humidity, battery_percent, speed_kmh, created_at, TRUE AS is_simulated FROM telemetry_simulation WHERE device_id = d.id
                 ) readings
                 ORDER BY created_at DESC, is_simulated DESC
                 LIMIT 1
@@ -199,13 +203,13 @@ exports.getVehicleById = async (req, res) => {
         if (deviceRes.rows.length > 0) {
             primaryDevice = liveDevices.find((device) => device.is_online) || liveDevices[0];
             const historyRes = await pool.query(`
-                SELECT id, device_id, device_token, temperature, humidity, created_at, is_simulated
+                SELECT id, device_id, device_token, temperature, humidity, battery_percent, speed_kmh, created_at, is_simulated
                 FROM (
-                    SELECT dt.id, dt.device_id, d.device_token, dt.temperature, dt.humidity, dt.created_at, FALSE AS is_simulated
+                    SELECT dt.id, dt.device_id, d.device_token, dt.temperature, dt.humidity, dt.battery_percent, dt.speed_kmh, dt.created_at, FALSE AS is_simulated
                     FROM data dt JOIN device d ON dt.device_id = d.id
                     WHERE d.vehicle_id = $1 AND d.id = $2
                     UNION ALL
-                    SELECT (ts.device_id * 1000000 + ts.slot)::bigint AS id, ts.device_id, d.device_token, ts.temperature, ts.humidity, ts.created_at, TRUE AS is_simulated
+                    SELECT (ts.device_id * 1000000 + ts.slot)::bigint AS id, ts.device_id, d.device_token, ts.temperature, ts.humidity, ts.battery_percent, ts.speed_kmh, ts.created_at, TRUE AS is_simulated
                     FROM telemetry_simulation ts JOIN device d ON ts.device_id = d.id
                     WHERE d.vehicle_id = $1 AND d.id = $2
                 ) readings

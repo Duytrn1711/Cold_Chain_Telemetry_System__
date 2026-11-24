@@ -56,6 +56,8 @@ CREATE TABLE data (
     device_id BIGINT NOT NULL,
     temperature DECIMAL(5, 2),
     humidity DECIMAL(5, 2),
+    battery_percent DECIMAL(5, 2) CHECK (battery_percent IS NULL OR (battery_percent >= 0 AND battery_percent <= 100)),
+    speed_kmh DECIMAL(6, 2) CHECK (speed_kmh IS NULL OR (speed_kmh >= 0 AND speed_kmh <= 250)),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_data_device
@@ -69,6 +71,8 @@ CREATE TABLE telemetry_simulation (
     slot SMALLINT NOT NULL CHECK (slot >= 0 AND slot < 60),
     temperature NUMERIC(5, 2) NOT NULL,
     humidity NUMERIC(5, 2) NOT NULL CHECK (humidity >= 0 AND humidity <= 100),
+    battery_percent NUMERIC(5, 2) CHECK (battery_percent IS NULL OR (battery_percent >= 0 AND battery_percent <= 100)),
+    speed_kmh NUMERIC(6, 2) CHECK (speed_kmh IS NULL OR (speed_kmh >= 0 AND speed_kmh <= 250)),
     created_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (device_id, slot)
 );

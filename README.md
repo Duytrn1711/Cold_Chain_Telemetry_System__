@@ -165,9 +165,9 @@ Content-Type: application/json
 }
 ```
 
-Có thể gửi thêm `humidity` nếu Arduino có cảm biến ẩm. Nếu Arduino chỉ giao tiếp USB/Serial (không có Wi-Fi), dịch vụ Cold Chain trên Render không thể đọc trực tiếp cổng COM của máy tính; cần chạy bridge trên máy đang cắm Arduino để chuyển Serial sang endpoint HTTPS này.
+Có thể gửi thêm `humidity` nếu Arduino có cảm biến ẩm. Nếu thiết bị có thêm cảm biến pin hoặc GPS, gửi kèm `battery_percent` (0–100) và `speed_kmh` (0–250); hai giá trị này là tùy chọn và để trống nếu phần cứng không cung cấp. Nếu Arduino chỉ giao tiếp USB/Serial (không có Wi-Fi), dịch vụ Cold Chain trên Render không thể đọc trực tiếp cổng COM của máy tính; cần chạy bridge trên máy đang cắm Arduino để chuyển Serial sang endpoint HTTPS này.
 
-Trên Windows, bridge có sẵn tại `Backend/scripts/arduino-serial-bridge.ps1`. Arduino cần in mỗi lần đo thành một object JSON trên một dòng, ví dụ `{"temperature":5.6,"humidity":0}`. Chạy PowerShell trên máy đang cắm Arduino; bridge sẽ hỏi secret theo dạng ẩn:
+Trên Windows, bridge có sẵn tại `Backend/scripts/arduino-serial-bridge.ps1`. Arduino cần in mỗi lần đo thành một object JSON trên một dòng, ví dụ `{"temperature":5.6,"humidity":0,"battery_percent":92,"speed_kmh":36.5}`. Chỉ gửi các trường pin/tốc độ khi phần cứng thực sự đo được. Chạy PowerShell trên máy đang cắm Arduino; bridge sẽ hỏi secret theo dạng ẩn:
 
 ```powershell
 $env:ARDUINO_DEVICE_TOKEN = "ARDUINO-ESP32-USB-01"
