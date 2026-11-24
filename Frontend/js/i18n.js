@@ -77,7 +77,7 @@
         ["Operational Reports", "Báo cáo vận hành"], ["Temperature Compliance", "Mức độ tuân thủ nhiệt độ"],
         ["Start Date", "Ngày bắt đầu"], ["End Date", "Ngày kết thúc"], ["Apply Filters", "Áp dụng bộ lọc"],
         ["Agri Batch Logistics", "Điều phối lô hàng Agri"], ["Lô nông sản từ Agri Audit", "Lô nông sản từ Agri Audit"],
-        ["According to Agri-Audit batches", "Theo dõi các lô hàng từ Agri-Audit"], ["MÃ LÔ / SẢN PHẨM", "MÃ LÔ / SẢN PHẨM"],
+        ["According to Agri-Audit batches", "Theo dõi các lô hàng từ Agri-Audit"],
         ["NÔNG DÂN", "NÔNG DÂN"], ["ĐIỂM LẤY", "ĐIỂM LẤY"], ["ĐÍCH ĐẾN", "ĐÍCH ĐẾN"], ["SỐ LƯỢNG", "SỐ LƯỢNG"],
         ["KIỂM ĐỊNH", "KIỂM ĐỊNH"], ["VẬN CHUYỂN", "VẬN CHUYỂN"], ["XE / THAO TÁC", "XE / THAO TÁC"],
         ["No batches found", "Không tìm thấy lô hàng"], ["Choose vehicle & dispatch", "Chọn xe và điều phối"],
@@ -133,28 +133,38 @@
         ["RECORDED RANGE", "KHOẢNG ĐÃ GHI NHẬN"], ["AUDIT STATUS", "TRẠNG THÁI KIỂM ĐỊNH"], ["All Time (Database)", "Toàn bộ thời gian (cơ sở dữ liệu)"],
         ["Today (Past 24 Hours)", "Hôm nay (24 giờ qua)"], ["Past 7 Days", "7 ngày qua"], ["Past 30 Days (Rolling)", "30 ngày gần nhất"],
         ["Certification unavailable", "Chưa hỗ trợ chứng nhận"], ["Certification evidence is not stored", "Chưa lưu hồ sơ chứng nhận"],
-        ["Quản lý lô hàng", "Batch Logistics"], ["Yêu cầu đăng ký tài khoản", "Account Registration Requests"],
+        ["Batch Logistics", "Quản lý lô hàng"], ["Cold Chain · Batch Logistics", "Cold Chain · Quản lý lô hàng"],
+        ["Agri-Audit integration", "Tích hợp Agri-Audit"], ["TEMPERATURE / HUMIDITY", "NHIỆT ĐỘ / ĐỘ ẨM"],
+        ["Yêu cầu đăng ký tài khoản", "Account Registration Requests"],
         ["Chọn vai trò được cấp trước khi phê duyệt. Tài khoản chờ duyệt chưa thể đăng nhập.", "Select the role to grant before approval. Pending accounts cannot sign in."],
-        ["Làm mới", "Refresh"], ["HỌ TÊN", "FULL NAME"], ["TÊN ĐĂNG NHẬP", "USERNAME"], ["EMAIL", "EMAIL"],
+        ["Refresh", "Làm mới"], ["HỌ TÊN", "FULL NAME"], ["TÊN ĐĂNG NHẬP", "USERNAME"], ["EMAIL", "EMAIL"],
         ["VAI TRÒ ĐỀ NGHỊ", "REQUESTED ROLE"], ["NGÀY GỬI", "SUBMITTED"], ["THAO TÁC", "ACTIONS"],
         ["Đang tải yêu cầu…", "Loading requests…"], ["Đang tải dữ liệu từ PostgreSQL...", "Loading data from PostgreSQL..."],
         ["Lô nông sản từ Agri Audit", "Agri-Audit Produce Batches"],
         ["Theo dõi lấy hàng, chuyển đến kiểm định và giao hoặc hoàn trả theo kết quả.", "Track pickup, inspection transfer, and delivery or return based on the result."],
-        ["Tất cả trạng thái", "All statuses"], ["Tìm mã lô, sản phẩm, nông dân...", "Search batch code, product, farmer..."],
-        ["Tìm lô hàng", "Search batches"], ["Đang tải dữ liệu từ PostgreSQL...", "Loading data from PostgreSQL..."],
-        ["MÃ LÔ / SẢN PHẨM", "BATCH / PRODUCT"], ["NÔNG DÂN", "FARMER"], ["ĐIỂM LẤY", "PICKUP LOCATION"],
-        ["ĐÍCH ĐẾN", "DESTINATION"], ["SỐ LƯỢNG", "QUANTITY"], ["KIỂM ĐỊNH", "INSPECTION"], ["VẬN CHUYỂN", "TRANSPORT"],
-        ["XE / THAO TÁC", "VEHICLE / ACTION"], ["Không tìm thấy lô hàng", "No batches found"],
-        ["Chờ kết quả", "Awaiting result"], ["Đạt", "Approved"], ["Từ chối", "Rejected"],
-        ["Đang chờ Agri cung cấp điểm tiêu thụ", "Waiting for Agri to provide the destination"],
-        ["Chờ điều xe lấy hàng", "Waiting for pickup dispatch"], ["Đã lấy hàng", "Picked up"],
-        ["Đã duyệt · chờ giao điểm tiêu thụ", "Approved · awaiting delivery to destination"],
-        ["Bị từ chối · chờ hoàn nông dân", "Rejected · awaiting return to farmer"],
-        ["Đã giao điểm tiêu thụ", "Delivered to destination"], ["Đã hoàn nông dân", "Returned to farmer"],
-        ["Đã bàn giao kiểm định", "Handed over for inspection"], ["Hàng đã về kho", "Goods received at warehouse"],
-        ["Chọn xe và điều phối", "Select vehicle and dispatch"], ["Xác nhận hàng đã về kho", "Confirm goods received at warehouse"],
-        ["Bàn giao kiểm định", "Hand over for inspection"], ["Xuất phát giao hàng", "Start delivery"],
-        ["Chưa gán xe", "No vehicle assigned"], ["Không còn thao tác", "No further action"],
+        ["All statuses", "Tất cả trạng thái"], ["Search batch code, product, farmer...", "Tìm mã lô, sản phẩm, nông dân..."],
+        ["Search batches", "Tìm lô hàng"], ["Loading data from PostgreSQL...", "Đang tải dữ liệu từ PostgreSQL..."],
+        ["BATCH / PRODUCT", "MÃ LÔ / SẢN PHẨM"], ["FARMER", "NÔNG DÂN"], ["PICKUP LOCATION", "ĐIỂM LẤY"],
+        ["DESTINATION", "ĐÍCH ĐẾN"], ["QUANTITY", "SỐ LƯỢNG"], ["INSPECTION", "KIỂM ĐỊNH"], ["TRANSPORT", "VẬN CHUYỂN"],
+        ["VEHICLE / ACTION", "XE / THAO TÁC"], ["No batches found", "Không tìm thấy lô hàng"],
+        ["Awaiting result", "Chờ kết quả"], ["Passed", "Đạt"], ["Rejected", "Từ chối"],
+        ["Waiting for Agri to provide the destination", "Đang chờ Agri cung cấp điểm tiêu thụ"],
+        ["Waiting for pickup dispatch", "Chờ điều xe lấy hàng"], ["Picking up from farmer", "Đang đi lấy hàng"],
+        ["Goods received at warehouse", "Hàng đã về kho"], ["Handed over for inspection", "Đã bàn giao kiểm định"],
+        ["Approved · awaiting delivery to destination", "Đã duyệt · chờ giao điểm tiêu thụ"],
+        ["Rejected · awaiting return to farmer", "Bị từ chối · chờ hoàn nông dân"],
+        ["Delivering to consumption point", "Đang giao điểm tiêu thụ"], ["Returning to farmer", "Đang hoàn về nông dân"],
+        ["Delivered to destination", "Đã giao điểm tiêu thụ"], ["Returned to farmer", "Đã hoàn nông dân"], ["Cancelled", "Đã hủy"],
+        ["Select vehicle and dispatch", "Chọn xe và điều phối"], ["Confirm goods received at warehouse", "Xác nhận hàng đã về kho"],
+        ["Hand over for inspection", "Bàn giao kiểm định"], ["Start delivery", "Xuất phát giao hàng"],
+        ["Start return", "Xuất phát hoàn hàng"], ["Confirm delivery", "Xác nhận đã giao"], ["Confirm return", "Xác nhận đã hoàn"],
+        ["No vehicle assigned", "Chưa gán xe"], ["No further action", "Không còn thao tác"],
+        ["Waiting for live reading", "Chờ số đo trực tiếp"], ["Not in transit", "Chưa vận chuyển"],
+        ["SIMULATION", "MÔ PHỎNG"], ["SENSOR", "CẢM BIẾN"], ["No available active vehicle", "Chưa có xe trống đang hoạt động"],
+        ["No active receiving warehouse", "Chưa có kho đang hoạt động"], ["Dispatch pickup vehicle", "Điều xe lấy hàng"],
+        ["No batches match the filters.", "Không có lô nào khớp bộ lọc."],
+        ["Agri-Audit just sent a batch:", "Agri-Audit vừa gửi lô hàng:"], ["new batches", "lô hàng mới"],
+        ["New batch received by Cold Chain", "Cold Chain nhận lô hàng mới"],
         ["Hệ thống Cold Chain", "Cold Chain System"], ["Một nơi để đội ngũ công ty theo dõi và điều phối hoạt động chuỗi lạnh.", "A central place for company teams to monitor and coordinate cold-chain operations."],
         ["Vận hành chuỗi lạnh an toàn, minh bạch.", "Safe and transparent cold-chain operations."],
         ["Hệ thống công ty quản lý kho lạnh, đội xe, thiết bị giám sát và quá trình vận chuyển nông sản từ điểm lấy hàng đến nơi tiêu thụ.", "The company system manages cold storage, fleet, monitoring devices, and produce transport from pickup to destination."],
@@ -261,6 +271,30 @@
     const storageKey = "coldchain_ui_language";
     const getLanguage = () => localStorage.getItem(storageKey) || "vi";
     const excluded = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "CODE"]);
+    const originalTextNodes = new WeakMap();
+    const originalAttributes = new WeakMap();
+
+    function translateTextNode(node, language) {
+        let state = originalTextNodes.get(node);
+        if (!state || node.nodeValue !== state.rendered) state = { source: node.nodeValue, rendered: null };
+        const translated = replacePhrases(state.source, language);
+        if (node.nodeValue !== translated) node.nodeValue = translated;
+        state.rendered = translated;
+        originalTextNodes.set(node, state);
+    }
+
+    function translateAttribute(element, attribute, language) {
+        const current = element.getAttribute(attribute);
+        if (!current) return;
+        let states = originalAttributes.get(element);
+        if (!states) { states = new Map(); originalAttributes.set(element, states); }
+        let state = states.get(attribute);
+        if (!state || current !== state.rendered) state = { source: current, rendered: null };
+        const translated = replacePhrases(state.source, language);
+        if (current !== translated) element.setAttribute(attribute, translated);
+        state.rendered = translated;
+        states.set(attribute, state);
+    }
 
     function replacePhrases(value, language) {
         let output = value;
@@ -281,8 +315,7 @@
     function translateElement(root, language) {
         if (root.nodeType === Node.TEXT_NODE) {
             if (root.parentElement && excluded.has(root.parentElement.tagName)) return;
-            const updated = replacePhrases(root.nodeValue, language);
-            if (updated !== root.nodeValue) root.nodeValue = updated;
+            translateTextNode(root, language);
             return;
         }
         if (root.nodeType !== Node.ELEMENT_NODE && root !== document) return;
@@ -303,11 +336,7 @@
 
     function translateAttributes(element, language) {
         ["placeholder", "title", "aria-label"].forEach((attribute) => {
-            const value = element.getAttribute(attribute);
-            if (value) {
-                const updated = replacePhrases(value, language);
-                if (updated !== value) element.setAttribute(attribute, updated);
-            }
+            translateAttribute(element, attribute, language);
         });
     }
 
